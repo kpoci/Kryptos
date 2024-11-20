@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %} Register Page {% endblock %}
+{% block content %}
+<div class="container" id="signup">
+    <h1 class="form-title">Register</h1>
+
+    <!-- Flash Messages Section -->
+    {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <form method="post" action="">
+        <!-- Username and Email Fields -->
+        <div class="input-group">
+            <i class="fas fa-user"></i>
+            <input type="text" name="username" id="username" placeholder="Username" required>
+            <label for="username">Username</label>
+        </div>
+        <div class="input-group">
+            <i class="fas fa-envelope"></i>
+            <input type="email" name="email" id="email" placeholder="Email" required>
+            <label for="email">Email</label>
+        </div>
+
+        <!-- Password Field with Strength Meter, Requirements, and Show Password Toggle -->
+        <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" name="password" id="password" placeholder="Password" required>
+            <label for="password">Password</label>
+            <!-- Password strength meter -->
+            <meter max="5" id="password-strength-meter"></meter>
+            <p id="password-strength-text"></p>
+            <!-- Password suggestions -->
+            <button type="button" id="generate-password" class="btn-secondary">Suggest Password</button>
+            <!-- Show Password Toggle -->
+            <div class="show-password-toggle">
+                <input type="checkbox" id="show-password">
+                <label for="show-password">Show Password</label>
+            </div>
+            <!-- Password requirements -->
+            <div>
+                <p style="color: #A9A9A9;">
+                    <i>Password must be at least 8 characters long and include uppercase letters, lowercase letters, numbers, and special characters. Spaces are allowed.</i>
+                </p>
+            </div>
+        </div>
+
+        <!-- Master Password Field with Strength Meter, Requirements, and Show Password Toggle -->
+        <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" name="master_pass" id="master_pass" placeholder="Master Password" required>
+            <label for="master_pass">Master Password</label>
+            <!-- Password strength meter -->
+            <meter max="5" id="master-pass-strength-meter"></meter>
+            <p id="master-pass-strength-text"></p>
+            <!-- Password suggestions -->
+            <button type="button" id="generate-master-pass" class="btn-secondary">Suggest Password</button>
+            <!-- Show Password Toggle -->
+            <div class="show-password-toggle">
+                <input type="checkbox" id="show-master-pass">
+                <label for="show-master-pass">Show Password</label>
+            </div>
+            <!-- Password requirements -->
+            <div>
+                <p style="color: #A9A9A9;"><i>Master password is for your password vault.</i></p>
+                <p style="color: #A9A9A9;">
+                    <i>It must be at least 8 characters long and include uppercase letters, lowercase letters, numbers, and special characters. Spaces are allowed.</i>
+                </p>
+            </div>
+        </div>
+
+        <!-- Security Password Field with Strength Meter, Requirements, and Show Password Toggle -->
+        <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input type="password" name="security_password" id="security_password" placeholder="Security Password" required>
+            <label for="security_password">Security Password</label>
+            <!-- Password strength meter -->
+            <meter max="5" id="security-pass-strength-meter"></meter>
+            <p id="security-pass-strength-text"></p>
+            <!-- Password suggestions -->
+            <button type="button" id="generate-security-pass" class="btn-secondary">Suggest Password</button>
+            <!-- Show Password Toggle -->
+            <div class="show-password-toggle">
+                <input type="checkbox" id="show-security-pass">
+                <label for="show-security-pass">Show Password</label>
+            </div>
+            <!-- Password requirements -->
+            <div>
+                <p style="color: #A9A9A9;"><i>Security password is used for account recovery.</i></p>
+                <p style="color: #A9A9A9;">
+                    <i>It must be at least 8 characters long and include uppercase letters, lowercase letters, numbers, and special characters. Spaces are allowed.</i>
+                </p>
+            </div>
+        </div>
+
+        <input type="submit" class="btn" value="Sign Up" name="signUp">
+    </form>
+    <!-- Go Back Button -->
+    <div class="go-back-link">
+        <p>Already have an account? <a href="{{ url_for('login') }}" class="btn-secondary">Go Back to Login</a></p>
+    </div>
+</div>
+<!-- Include JavaScript files -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- Include zxcvbn if using it -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/zxcvbn/4.4.2/zxcvbn.js"></script> 
+<script src="{{ url_for('static', filename='register.js') }}"></script>
+
+{% endblock %}
