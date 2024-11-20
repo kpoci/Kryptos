@@ -12,9 +12,9 @@ import argon2
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import re
 import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField
+from wtforms.validators import DataRequired, Length, Regexp
 
 def send_email(to_email, subject, message):
     sender_email = "bot067744@gmail.com"
@@ -43,12 +43,29 @@ app.config['MYSQL_USER'] = "root"
 app.config['MYSQL_PASSWORD'] = ""
 app.config['MYSQL_DB'] = "users"
 app.secret_key = os.environ.get('SECRET_KEY', 'default_secret_key')
+app.config['SECRET KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key')
+app.config['WTF_CSRF_ENABLED'] = False
 
 mysql = MySQL(app)
 
 # PasswordHasher instance with custom parameters
 ph = PasswordHasher(memory_cost=102400, time_cost=1, parallelism=8)
+# Initialize CSRF Protection
 
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class OTPVerificationForm(FlaskForm):
+    otp = StringField('OTP', validators=[
+        DataRequired(message="Please enter the OTP."),
+        Length(min=6, max=6, message='OTP must be exactly 6 digits.'),
+        Regexp('^\d{6}$', message='OTP must contain only numbers.')
+    ])
+    submit = SubmitField('Verify OTP')
+
+class ResendOTPForm(FlaskForm):
+    submit = SubmitField('Resend OTP')
 
 # Home Route
 @app.route('/home')
@@ -214,62 +231,67 @@ def login():
 @app.route('/otp_verification', methods=['GET', 'POST'])
 def otp_verification():
     if 'temp_user_id' not in session:
+        flash("Session expired. Please log in again.", "error")
         return redirect(url_for('login'))
 
-    user_id = session['temp_user_id']
+    form = OTPVerificationForm()
+    resend_form = ResendOTPForm()
 
-    # Fetch the user's email address
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cur.execute("SELECT email FROM accounts WHERE Id = %s", (user_id,))
-    user_data = cur.fetchone()
-    cur.close()
+    if form.validate_on_submit():
+        entered_otp = form.otp.data
+        user_id = session['temp_user_id']
 
-    if not user_data:
-        flash("User not found. Please log in again.", "error")
-        return redirect(url_for('login'))
-
-    # Mask the email for privacy
-    def mask_email(email):
         try:
-            local_part, domain_part = email.split('@')
-            if len(local_part) > 2:
-                local_part = local_part[0] + '***' + local_part[-1]
-            else:
-                local_part = local_part[0] + '*'
-            return f"{local_part}@{domain_part}"
-        except Exception:
-            return email
+            with mysql.connection.cursor(DictCursor) as cur:
+                cur.execute("SELECT otp, otp_expiry FROM accounts WHERE Id = %s", (user_id,))
+                user = cur.fetchone()
 
-    email = mask_email(user_data['email'])
+                if not user:
+                    flash("User not found.", "error")
+                    logger.error(f"User with ID {user_id} not found during OTP verification.")
+                    return redirect(url_for('login'))
 
-    if request.method == 'POST':
-        user_otp = request.form['otp']
+                stored_otp = user.get('otp')
+                otp_expiry = user.get('otp_expiry')
 
-        # Fetch OTP and expiry from the database
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cur.execute("SELECT otp, otp_expiry FROM accounts WHERE Id = %s", (user_id,))
-        otp_data = cur.fetchone()
-        cur.close()
+                if not stored_otp or not otp_expiry:
+                    flash("OTP not found. Please request a new one.", "error")
+                    logger.warning(f"OTP or expiry not found for user ID {user_id}.")
+                    return redirect(url_for('resend_otp'))
 
-        # Check if OTP is valid and not expired
-        if otp_data and str(otp_data['otp']) == user_otp and datetime.now() < otp_data['otp_expiry']:
-            # Set user session and clear temporary session
-            session['user_id'] = user_id
-            session.pop('temp_user_id', None)
+                if datetime.now() > otp_expiry:
+                    flash("OTP has expired. Please request a new one.", "error")
+                    logger.info(f"OTP expired for user ID {user_id}.")
+                    return redirect(url_for('resend_otp'))
 
-            # Clear OTP from database after successful verification
-            cur = mysql.connection.cursor()
-            cur.execute("UPDATE accounts SET otp = NULL, otp_expiry = NULL WHERE Id = %s", (user_id,))
-            mysql.connection.commit()
-            cur.close()
-
-            flash("Logged in successfully!", "success")
-            return redirect(url_for('home'))  # Redirect to home page
-        else:
-            flash("Invalid or expired OTP. Please try again.", "error")
+                if entered_otp == str(stored_otp):
+                    # OTP is correct
+                    session.pop('temp_user_id', None)
+                    session['user_id'] = user_id  # Assuming 'user_id' is the key for logged-in users
+                    flash("Logged in successfully!", "success")
+                    logger.info(f"User ID {user_id} logged in successfully.")
+                    return redirect(url_for('home'))
+                else:
+                    flash("Invalid OTP. Please try again.", "error")
+                    logger.warning(f"Invalid OTP entered for user ID {user_id}.")
+                    return redirect(url_for('otp_verification'))
+        except Exception as e:
+            logger.error(f"Error during OTP verification for user ID {user_id}: {e}")
+            flash("An error occurred during OTP verification. Please try again.", "error")
             return redirect(url_for('otp_verification'))
 
-    return render_template('otp_verification.html', email=email)
+    # Fetch user's email to display
+    user_id = session['temp_user_id']
+    try:
+        with mysql.connection.cursor(DictCursor) as cur:
+            cur.execute("SELECT email FROM accounts WHERE Id = %s", (user_id,))
+            user = cur.fetchone()
+            email = user.get('email') if user else 'your email'
+    except Exception as e:
+        logger.error(f"Error fetching email for user ID {user_id}: {e}")
+        email = 'your email'
+
+    return render_template('otp_verification.html', email=email, form=form, resend_form=resend_form)
 
 #Route to Request Password Reset       
 @app.route('/recover_password', methods=['GET', 'POST'])
@@ -313,36 +335,8 @@ def recover_password():
             return redirect(url_for('recover_password'))
     return render_template('recover_password.html')
 
-# Route to Verify OTP and Proceed to Security Password Verification
-@app.route('/verify_reset_otp', methods=['GET', 'POST'])
-def verify_reset_otp():
-    if 'reset_email' not in session:
-        flash("Session expired. Please request a new OTP.", "error")
-        return redirect(url_for('recover_password'))
-
-    if request.method == 'POST':
-        otp_input = request.form['otp']
-        email = session['reset_email']
-
-        # Fetch the OTP and expiry from the database
-        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cur.execute("SELECT reset_otp, reset_otp_expiry FROM accounts WHERE email = %s", (email,))
-        account = cur.fetchone()
-        cur.close()
-
-        # Check if OTP is valid and not expired
-        if account and account['reset_otp'] == otp_input and account['reset_otp_expiry'] > datetime.now():
-            # OTP is valid
-            session['otp_verified'] = True  # Set session variable to indicate OTP verification
-            flash("OTP verified. Please enter your security password.", "success")
-            return redirect(url_for('verify_security_password'))
-        else:
-            flash("Invalid or expired OTP. Please try again.", "error")
-            return redirect(url_for('verify_reset_otp'))
-    return render_template('verify_reset_otp.html')
-
-#resend otp
-@app.route('/resend_otp')
+# Resend OTP Route
+@app.route('/resend_otp', methods=['GET','POST'])
 def resend_otp():
     if 'temp_user_id' not in session:
         flash("Session expired. Please log in again.", "error")
@@ -351,8 +345,8 @@ def resend_otp():
     user_id = session['temp_user_id']
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
     try:
-        # Fetch user email and username
-        cur.execute("SELECT username, email FROM accounts WHERE Id = %s", (user_id,))
+        # Fetch user email
+        cur.execute("SELECT email, username FROM accounts WHERE Id = %s", (user_id,))
         user = cur.fetchone()
         if not user:
             flash("User not found.", "error")
@@ -386,6 +380,84 @@ def resend_otp():
         return redirect(url_for('otp_verification'))
     finally:
         cur.close()
+        
+# Route to Verify OTP and Proceed to Security Password Verification
+@app.route('/verify_reset_otp', methods=['GET', 'POST'])
+def verify_reset_otp():
+    if 'reset_email' not in session:
+        flash("Session expired. Please request a new OTP.", "error")
+        return redirect(url_for('recover_password'))
+
+    if request.method == 'POST':
+        otp_input = request.form['otp']
+        email = session['reset_email']
+
+        # Fetch the OTP and expiry from the database
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT reset_otp, reset_otp_expiry FROM accounts WHERE email = %s", (email,))
+        account = cur.fetchone()
+        cur.close()
+
+        # Check if OTP is valid and not expired
+        if account and account['reset_otp'] == otp_input and account['reset_otp_expiry'] > datetime.now():
+            # OTP is valid
+            session['otp_verified'] = True  # Set session variable to indicate OTP verification
+            flash("OTP verified. Please enter your security password.", "success")
+            return redirect(url_for('verify_security_password'))
+        else:
+            flash("Invalid or expired OTP. Please try again.", "error")
+            return redirect(url_for('verify_reset_otp'))
+    return render_template('verify_reset_otp.html')
+
+#resend otp
+
+def resend_otp():
+    if 'temp_user_id' not in session:
+        flash("Session expired. Please log in again.", "error")
+        logger.warning("Attempt to resend OTP without valid session.")
+        return redirect(url_for('login'))
+
+    user_id = session['temp_user_id']
+
+    try:
+        with mysql.connection.cursor(DictCursor) as cur:
+            # Fetch user email and username
+            cur.execute("SELECT username, email FROM accounts WHERE Id = %s", (user_id,))
+            user = cur.fetchone()
+            if not user:
+                flash("User not found.", "error")
+                logger.error(f"User with ID {user_id} not found during resend OTP.")
+                return redirect(url_for('login'))
+
+            # Generate a new OTP
+            otp = random.randint(100000, 999999)
+            otp_expiry = datetime.now() + timedelta(minutes=5)
+
+            # Update OTP and expiry in the accounts table
+            cur.execute("UPDATE accounts SET otp = %s, otp_expiry = %s WHERE Id = %s", (otp, otp_expiry, user_id))
+            mysql.connection.commit()
+            logger.info(f"Generated new OTP for user {user['username']} (ID: {user_id}).")
+
+            # Send OTP email
+            subject = "Your OTP for Login (Resent)"
+            message = f"""
+            <p>Dear {user['username']},</p>
+            <p>Your new OTP for login is: <strong>{otp}</strong></p>
+            <p>This OTP is valid for the next 5 minutes.</p>
+            <p>Please do not reply to this email. If you did not request this OTP, please contact our support team at djl0466@dlsud.edu.ph.</p>
+            <p>Best regards,<br>Kryptos***</p>
+            """
+            send_email(user['email'], subject, message)
+            logger.info(f"Resent OTP email to {user['email']}.")
+
+            flash("A new OTP has been sent to your email.", "success")
+            return redirect(url_for('otp_verification'))
+    except Exception as e:
+        mysql.connection.rollback()
+        logger.error(f"Error resending OTP for user ID {user_id}: {e}")
+        flash("Failed to resend OTP. Please try again.", "error")
+        return redirect(url_for('otp_verification'))
+        
 #UPDATED
 @app.route('/passwordvault')
 def passwordvault():

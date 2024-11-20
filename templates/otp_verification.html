@@ -107,12 +107,43 @@
         <p>Please enter the 6-digit OTP code that was sent to your email address: <strong>{{ email }}</strong>.</p>
         <!-- Form to submit OTP to server -->
         <form method="POST" action="{{ url_for('otp_verification') }}">
-            <input type="text" name="otp" id="otp" placeholder="Enter your OTP" maxlength="6" required>
+            
+            <input type="text" name="otp" id="otp" placeholder="Enter your OTP" maxlength="6" pattern="\d{6}" required>
             <button type="submit">Verify OTP</button>
         </form>
         <div class="resend-link">
-            <p>Didn't receive the code? <a href="otp_verification">Resend OTP</a></p>
+            <p>Didn't receive the code?</p>
+            <form id="resend-otp-form" action="{{ url_for('resend_otp') }}" method="POST" style="display: inline;">
+                {{ resend_form.csrf_token }}
+                <button type="submit" class="btn btn-link p-0 m-0 align-baseline" id="resend-otp-btn">Resend OTP</button>
+            </form>
+            <p id="countdown" style="display: none;">Please wait <span id="timer">60</span> seconds before resending.</p>
         </div>
     </div>
+
+    <script>
+        document.getElementById('resend-otp-form').addEventListener('submit', function(event) {
+            var button = document.getElementById('resend-otp-btn');
+            var countdownElement = document.getElementById('countdown');
+            var timer = document.getElementById('timer');
+            var countdown = 60; // 60 seconds cooldown
+
+            // Disable the button and start countdown
+            button.disabled = true;
+            button.innerText = 'Resending...';
+            countdownElement.style.display = 'block';
+
+            var interval = setInterval(function() {
+                countdown--;
+                timer.innerText = countdown;
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    button.disabled = false;
+                    button.innerText = 'Resend OTP';
+                    countdownElement.style.display = 'none';
+                }
+            }, 1000);
+        });
+    </script>
 </body>
 </html>
