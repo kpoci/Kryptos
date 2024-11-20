@@ -1,11 +1,41 @@
 import os
 import MySQLdb
 from MySQLdb.cursors import DictCursor
-from flask import Flask, jsonify, render_template, session, request, redirect, url_for
 from flask_mysqldb import MySQL
 from argon2 import PasswordHasher
 from cryptography.fernet import Fernet, InvalidToken
+import random
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta
+import argon2
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+import re
+import logging
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def send_email(to_email, subject, message):
+    sender_email = "bot067744@gmail.com"
+    sender_password = "ytwj euls irhw nrzo"  # Use a real app password or environment-secured password
+    sender_name = "verificationbot"
+
+    # Create MIMEText message
+    msg = MIMEText(message, 'html')
+    msg['Subject'] = subject
+    msg['From'] = f"{sender_name} <{sender_email}>"
+    msg['To'] = to_email
+
+    # Send email via SMTP
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, to_email, msg.as_string())
+        print("Email sent successfully.")
+    except Exception as e:
+        print("Failed to send email:", e)
+        raise #For raising the exception
 
 app = Flask(__name__)
 app.config['MYSQL_HOST'] = "localhost"
@@ -19,47 +49,23 @@ mysql = MySQL(app)
 # PasswordHasher instance with custom parameters
 ph = PasswordHasher(memory_cost=102400, time_cost=1, parallelism=8)
 
-@app.route("/test", methods=["POST", "GET"])
-def test():
-    return render_template("test.html")
 
-
-@app.route("/home", methods=["POST", "GET"])
+# Home Route
+@app.route('/home')
 def home():
-
     if 'user_id' in session:
         user_id = session['user_id']
-        # Assuming you have a way to get the username using the user_id
-        cur = mysql.connection.cursor()
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
         cur.execute("SELECT username FROM accounts WHERE Id = %s", (user_id,))
         user = cur.fetchone()
         cur.close()
-        if user:
-            username = user[0]
-        else:
-            # Handle case where no user is found
-            username = "Unknown"
+        username = user['username'] if user else "Unknown"
         return render_template("home.html", username=username)
     else:
-        # Handle the case where there is no user_id in session
-        return redirect(url_for('login')) 
+        return redirect(url_for('login'))
 
 @app.route("/", methods=["POST", "GET"])
-def login():
-    if request.method == "POST":
-        username = request.form['username']
-        pwd = request.form['password']
-
-        cur = mysql.connection.cursor()
-        cur.execute("SELECT Id, password FROM accounts WHERE username = %s", (username,))
-        user = cur.fetchone()
-        cur.close()
-
-        if user and ph.verify(user[1], pwd):
-            session['user_id'] = user[0]  # Storing the numerical Id from the accounts table
-            return redirect(url_for('home'))
-        else:
-            return 'Invalid username or password'
+def index():
     return render_template('login.html')
 
 
@@ -82,6 +88,304 @@ def register():
     
     return render_template('register.html')
 
+#settings
+@app.route('/settings')
+def settings():
+    return render_template('settings.html')
+
+# Login Route with Enhanced Error Handling and Account Lockout Notification
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        try:
+            # Fetch user from the database
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute("SELECT * FROM accounts WHERE username = %s", (username,))
+            user = cur.fetchone()
+            cur.close()
+
+            if user:
+                # Check if account is locked
+                lockout_until = user.get('lockout_until')
+                if lockout_until:
+                    # Parse lockout_until to datetime if necessary
+                    if isinstance(lockout_until, str):
+                        try:
+                            lockout_until = datetime.strptime(lockout_until, '%Y-%m-%d %H:%M:%S')
+                        except ValueError as ve:
+                            print(f"Error parsing lockout_until: {ve}")
+                            lockout_until = None
+                    if lockout_until and datetime.now() < lockout_until:
+                        flash("Account is temporarily locked due to multiple failed login attempts. Please try again later.", "error")
+                        return redirect(url_for('login'))
+
+                # Proceed with password verification
+                try:
+                    ph.verify(user['password'], password)
+                    # Password is correct
+                    # Reset failed attempts on successful login
+                    cur = mysql.connection.cursor()
+                    cur.execute("UPDATE accounts SET failed_attempts = 0, lockout_until = NULL WHERE Id = %s", (user['Id'],))
+                    mysql.connection.commit()
+                    cur.close()
+
+                    # Generate OTP and expiry time
+                    otp = random.randint(100000, 999999)
+                    otp_expiry = datetime.now() + timedelta(minutes=5)
+
+                    # Update OTP and expiry in the accounts table
+                    cur = mysql.connection.cursor()
+                    cur.execute("UPDATE accounts SET otp = %s, otp_expiry = %s WHERE Id = %s", (otp, otp_expiry, user['Id']))
+                    mysql.connection.commit()
+                    cur.close()
+
+                    # Send OTP email
+                    subject = "Your OTP for Login"
+                    message = f"""
+                    <p>Dear {user['username']},</p>
+                    <p>Your OTP for login is: <strong>{otp}</strong></p>
+                    <p>This OTP is valid for the next 5 minutes.</p>
+                    <p>Please do not reply to this email. If you did not request this OTP, please contact our support team at djl0466@dlsud.edu.ph.</p>
+                    <p>Best regards,<br>Kryptos***</p>
+                    """
+                    send_email(user['email'], subject, message)
+
+                    session['temp_user_id'] = user['Id']
+                    flash("OTP sent to your email!", "success")
+                    return redirect(url_for('otp_verification'))
+                except argon2.exceptions.VerifyMismatchError:
+                    # Password is incorrect
+                    # Increment failed_attempts
+                    cur = mysql.connection.cursor()
+                    cur.execute("UPDATE accounts SET failed_attempts = failed_attempts + 1 WHERE Id = %s", (user['Id'],))
+                    mysql.connection.commit()
+
+                    # Fetch updated failed_attempts
+                    cur.execute("SELECT failed_attempts FROM accounts WHERE Id = %s", (user['Id'],))
+                    updated_user = cur.fetchone()
+                    failed_attempts = updated_user['failed_attempts']
+                    cur.close()
+
+                    if failed_attempts >= 5:
+                        lockout_until = datetime.now() + timedelta(minutes=1440)  # Lock account for 1 day
+                        cur = mysql.connection.cursor()
+                        cur.execute("UPDATE accounts SET lockout_until = %s WHERE Id = %s", (lockout_until, user['Id']))
+                        mysql.connection.commit()
+                        cur.close()
+
+                        # Send account lockout email notification
+                        subject = "Your Account Has Been Locked"
+                        message = f"""
+                        <p>Dear {user['username']},</p>
+                        <p>Your account has been locked due to 5 invalid login attempts.</p>
+                        <p>If this was not you, please consider changing your password immediately.</p>
+                        <p>You will be able to attempt login again after 1 day.</p>
+                        <p>If you need assistance, please contact our support team at djl0466@dlsud.edu.ph.</p>
+                        <p>Best regards,<br>Kryptos***</p>
+                        """
+                        send_email(user['email'], subject, message)
+
+                        flash("Account locked due to multiple failed login attempts. Please check your email for more information.", "error")
+                    else:
+                        remaining_attempts = 5 - failed_attempts
+                        flash(f"Incorrect password. {remaining_attempts} attempt(s) remaining.", "error")
+                    return redirect(url_for('login'))
+                except Exception as e:
+                    print(f"Error during password verification: {e}")
+                    flash("An error occurred during login. Please try again.", "error")
+                    return redirect(url_for('login'))
+            else:
+                # Username not found
+                flash("Username not found. Please check and try again.", "error")
+                return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Database error: {e}")
+            flash("An error occurred during login. Please try again.", "error")
+            return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+
+
+# OTP Verification Route
+@app.route('/otp_verification', methods=['GET', 'POST'])
+def otp_verification():
+    if 'temp_user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['temp_user_id']
+
+    # Fetch the user's email address
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("SELECT email FROM accounts WHERE Id = %s", (user_id,))
+    user_data = cur.fetchone()
+    cur.close()
+
+    if not user_data:
+        flash("User not found. Please log in again.", "error")
+        return redirect(url_for('login'))
+
+    # Mask the email for privacy
+    def mask_email(email):
+        try:
+            local_part, domain_part = email.split('@')
+            if len(local_part) > 2:
+                local_part = local_part[0] + '***' + local_part[-1]
+            else:
+                local_part = local_part[0] + '*'
+            return f"{local_part}@{domain_part}"
+        except Exception:
+            return email
+
+    email = mask_email(user_data['email'])
+
+    if request.method == 'POST':
+        user_otp = request.form['otp']
+
+        # Fetch OTP and expiry from the database
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT otp, otp_expiry FROM accounts WHERE Id = %s", (user_id,))
+        otp_data = cur.fetchone()
+        cur.close()
+
+        # Check if OTP is valid and not expired
+        if otp_data and str(otp_data['otp']) == user_otp and datetime.now() < otp_data['otp_expiry']:
+            # Set user session and clear temporary session
+            session['user_id'] = user_id
+            session.pop('temp_user_id', None)
+
+            # Clear OTP from database after successful verification
+            cur = mysql.connection.cursor()
+            cur.execute("UPDATE accounts SET otp = NULL, otp_expiry = NULL WHERE Id = %s", (user_id,))
+            mysql.connection.commit()
+            cur.close()
+
+            flash("Logged in successfully!", "success")
+            return redirect(url_for('home'))  # Redirect to home page
+        else:
+            flash("Invalid or expired OTP. Please try again.", "error")
+            return redirect(url_for('otp_verification'))
+
+    return render_template('otp_verification.html', email=email)
+
+#Route to Request Password Reset       
+@app.route('/recover_password', methods=['GET', 'POST'])
+def recover_password():
+    if request.method == 'POST':
+        email = request.form['email']
+
+        # Check if the email exists in the database
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT * FROM accounts WHERE email = %s", (email,))
+        account = cur.fetchone()
+
+        if account:
+            # Generate a 6-digit OTP
+            otp = str(random.randint(100000, 999999))
+            otp_expiry = datetime.now() + timedelta(minutes=10)  # OTP valid for 10 minutes
+
+            # Store the OTP and expiry in the database
+            cur.execute("UPDATE accounts SET reset_otp = %s, reset_otp_expiry = %s WHERE email = %s",
+                        (otp, otp_expiry, email))
+            mysql.connection.commit()
+
+            # Send email with OTP
+            subject = "Your Password Reset OTP"
+            message = f"""
+            <p>Dear {account['username']},</p>
+            <p>Your OTP for password reset is: <strong>{otp}</strong></p>
+            <p>This OTP is valid for the next 10 minutes.</p>
+            <p>Please do not reply to this email. If you did not request this OTP, please contact our support team at djl0466@dlsud.edu.ph.</p>
+            <p>Best regards,<br>Kyrptos***</p>
+            """
+            send_email(email, subject, message)
+
+            # Store the user's email temporarily in the session
+            session['reset_email'] = email
+
+            flash("An OTP has been sent to your email.", "success")
+            return redirect(url_for('verify_reset_otp'))
+        else:
+            flash("Email not found.", "error")
+            return redirect(url_for('recover_password'))
+    return render_template('recover_password.html')
+
+# Route to Verify OTP and Proceed to Security Password Verification
+@app.route('/verify_reset_otp', methods=['GET', 'POST'])
+def verify_reset_otp():
+    if 'reset_email' not in session:
+        flash("Session expired. Please request a new OTP.", "error")
+        return redirect(url_for('recover_password'))
+
+    if request.method == 'POST':
+        otp_input = request.form['otp']
+        email = session['reset_email']
+
+        # Fetch the OTP and expiry from the database
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("SELECT reset_otp, reset_otp_expiry FROM accounts WHERE email = %s", (email,))
+        account = cur.fetchone()
+        cur.close()
+
+        # Check if OTP is valid and not expired
+        if account and account['reset_otp'] == otp_input and account['reset_otp_expiry'] > datetime.now():
+            # OTP is valid
+            session['otp_verified'] = True  # Set session variable to indicate OTP verification
+            flash("OTP verified. Please enter your security password.", "success")
+            return redirect(url_for('verify_security_password'))
+        else:
+            flash("Invalid or expired OTP. Please try again.", "error")
+            return redirect(url_for('verify_reset_otp'))
+    return render_template('verify_reset_otp.html')
+
+#resend otp
+@app.route('/resend_otp')
+def resend_otp():
+    if 'temp_user_id' not in session:
+        flash("Session expired. Please log in again.", "error")
+        return redirect(url_for('login'))
+
+    user_id = session['temp_user_id']
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # Fetch user email and username
+        cur.execute("SELECT username, email FROM accounts WHERE Id = %s", (user_id,))
+        user = cur.fetchone()
+        if not user:
+            flash("User not found.", "error")
+            return redirect(url_for('login'))
+
+        # Generate a new OTP
+        otp = random.randint(100000, 999999)
+        otp_expiry = datetime.now() + timedelta(minutes=5)
+
+        # Update OTP and expiry in the accounts table
+        cur.execute("UPDATE accounts SET otp = %s, otp_expiry = %s WHERE Id = %s", (otp, otp_expiry, user_id))
+        mysql.connection.commit()
+
+        # Send OTP email
+        subject = "Your OTP for Login (Resent)"
+        message = f"""
+        <p>Dear {user['username']},</p>
+        <p>Your new OTP for login is: <strong>{otp}</strong></p>
+        <p>This OTP is valid for the next 5 minutes.</p>
+        <p>Please do not reply to this email. If you did not request this OTP, please contact our support team at djl0466@dlsud.edu.ph</p>
+        <p>Best regards,<br>Kyrptos***</p>
+        """
+        send_email(user['email'], subject, message)
+        
+        flash("A new OTP has been sent to your email.", "success")
+        return redirect(url_for('otp_verification'))
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error resending OTP: {e}")
+        flash("Failed to resend OTP. Please try again.", "error")
+        return redirect(url_for('otp_verification'))
+    finally:
+        cur.close()
 #UPDATED
 @app.route('/passwordvault')
 def passwordvault():
@@ -107,7 +411,7 @@ def passwordvault():
         fernet = Fernet(encryption_key)  # Initialize Fernet with the encryption key
 
         # Fetch passwords associated with this key_id
-        cur.execute("SELECT password_id, site, login_name, passwords FROM passwords WHERE key_id = %s", (key_id,))
+        cur.execute("SELECT password_id, site, login_name, passwords, title FROM passwords WHERE key_id = %s", (key_id,))
         encrypted_passwords = cur.fetchall()
 
         # Decrypt passwords for this category
@@ -122,6 +426,7 @@ def passwordvault():
                 decrypted_passwords.append({
                     'id': password['password_id'],
                     'site': password['site'],
+                    'title': password['title'],
                     'login_name': password['login_name'],
                     'passwords': decrypted_password  # Add decrypted password
                 })
@@ -131,6 +436,7 @@ def passwordvault():
                 decrypted_passwords.append({
                     'id': password['password_id'],
                     'site': password['site'],
+                    'title': password['title'],
                     'login_name': password['login_name'],
                     'passwords': "[Decryption Failed]"  # Placeholder if decryption fails
                 })
@@ -167,7 +473,7 @@ def get_keys_from_database(user_id):
     
     # SQL query to fetch keys
     cur = mysql.connection.cursor()
-    cur.execute("SELECT * FROM 'keys' WHERE user_id = %s", (user_id,))
+    cur.execute("SELECT * FROM `keys` WHERE user_id = %s", (user_id,))
     keys = cur.fetchall()
     cur.close()
 

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Two-Step Verification</title>
+    <style>
+        /* Reset some basic elements */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .verification-container {
+            background-color: #fff;
+            width: 400px;
+            padding: 40px 30px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .verification-container h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .verification-container p {
+            font-size: 16px;
+            margin-bottom: 30px;
+            color: #555;
+        }
+
+        .verification-container form {
+            width: 100%;
+        }
+
+        .verification-container input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            border: 1px solid #ccd0d5;
+            border-radius: 4px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .verification-container input[type="text"]:focus {
+            border-color: #1877f2;
+            box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.2);
+        }
+
+        .verification-container button {
+            width: 100%;
+            padding: 12px 15px;
+            font-size: 16px;
+            background-color: rgb(8, 109, 73);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .verification-container button:hover {
+            background-color: rgb(8, 109, 73);
+        }
+
+        .verification-container .resend-link {
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .verification-container .resend-link a {
+            color: #1877f2;
+            text-decoration: none;
+        }
+
+        .verification-container .resend-link a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 480px) {
+            .verification-container {
+                width: 90%;
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="verification-container">
+        <h2>Two-Step Verification</h2>
+        <p>Please enter the 6-digit OTP code that was sent to your email address: <strong>{{ email }}</strong>.</p>
+        <!-- Form to submit OTP to server -->
+        <form method="POST" action="{{ url_for('otp_verification') }}">
+            <input type="text" name="otp" id="otp" placeholder="Enter your OTP" maxlength="6" required>
+            <button type="submit">Verify OTP</button>
+        </form>
+        <div class="resend-link">
+            <p>Didn't receive the code? <a href="otp_verification">Resend OTP</a></p>
+        </div>
+    </div>
+</body>
+</html>

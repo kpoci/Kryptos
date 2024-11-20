@@ -238,3 +238,53 @@ button:hover{
 .btn-sm {
     color: #0f4b0f !important; /* Ensure color change takes priority */ /* Optional: Make it bold for emphasis */
 }
+.custom-nav-column {
+    background-color: rgb(8, 109, 73);
+    color: white;
+}
+
+.custom-tab-content {
+    background-color: rgb(8, 109, 73);
+}
+
+.nav-pills .nav-link.active {
+    background-color: rgb(8, 109, 73);
+    color: white;
+}
+
+.nav-pills .nav-link:hover {
+    background-color: rgb(8, 109, 73);
+    color: white;
+}
+
+.nav-pills .nav-link {
+    color: black;
+}
+
+
+#v-pills-logout-tab:hover {
+    background-color: #A32424 !important;
+    color: white;
+}
+
+.site-column {
+    width: 237.02px;
+    height: 40.09px;
+    overflow: hidden;            /* Hide overflow content */
+    white-space: nowrap;         /* Prevent text wrapping */
+    text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
+.upd_del-column {
+    width: 70px;
+    height: 40.09px;
+    overflow: hidden;            /* Hide overflow content */
+    white-space: nowrap;         /* Prevent text wrapping */
+    text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
+.title-column {
+    width: 170.02px;
+    height: 40.09px;
+    overflow: hidden;            /* Hide overflow content */
+    white-space: nowrap;         /* Prevent text wrapping */
+    text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
