@@ -59,14 +59,7 @@ input:focus{
 input::placeholder{
     color:transparent;
 }
-label{
-    color:#757575;
-    position:relative;
-    left:1.2em;
-    top:-1.3em;
-    cursor:auto;
-    transition:0.3s ease all;
-}
+
 input:focus~label,input:not(:placeholder-shown)~label{
     top:-3em;
     color:rgb(8, 109, 73);
@@ -86,7 +79,7 @@ input:focus~label,input:not(:placeholder-shown)~label{
     color:blue;
     text-decoration:underline;
 }
-.btn{
+.btn1{
     font-size:1.1rem;
     padding:8px 0;
     border-radius:50px;
@@ -107,7 +100,7 @@ input:focus~label,input:not(:placeholder-shown)~label{
     outline:none;
     border:none;
     width:100%;
-    background:rgb(113, 113, 122);
+    background:rgb(8, 109, 73);
     color:white;
     cursor:pointer;
     transition:0.9s;
@@ -142,10 +135,6 @@ input:focus~label,input:not(:placeholder-shown)~label{
     justify-content: center;
 }
 
-.btn:hover{
-    background:#002c0d;
-    color:#ffffff ;
-}
 .or{
     font-size:1.1rem;
     margin-top:0.5rem;
@@ -190,15 +179,7 @@ button:hover{
 
 .navbar_shadow{
     box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.25);
-
-
 }
-.modal-footer {
-    display: flex !important;  /* Ensures the flex display */
-    flex-wrap: nowrap !important;  /* Prevents wrapping */
-    justify-content: space-between;  /* Space between the buttons */
-}
-
 /* Add this CSS for your password view table */
 .table-container {
     width: 100%; /* Ensures it fits within the card */
@@ -220,7 +201,7 @@ button:hover{
 }
 /* CSS for navbar link hover effect */
 .nav-link:hover {
-    background-color: #007bff; /* Change this to your preferred color */
+    background-color: rgb(8, 109, 73); /* Change this to your preferred color */
     color: white; /* Text color on hover */
     transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition */
 }
@@ -267,14 +248,35 @@ button:hover{
     color: white;
 }
 
+.table>:not(caption)>*>*{
+    background-color: #f9fbfd;
+}
 .site-column {
-    width: 237.02px;
+    align-content: center;
+    width: 412.17px;
+    height: 40.09px;
+    overflow: hidden;            /* Hide overflow content */
+    white-space: nowrap;         /* Prevent text wrapping */
+    text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
+.login-column {
+    align-content: center;
+    width: 250.17px;
+    height: 40.09px;
+    overflow: hidden;            /* Hide overflow content */
+    white-space: nowrap;         /* Prevent text wrapping */
+    text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
+.password-column {
+    align-content: center;
+    width: 474.88px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
     white-space: nowrap;         /* Prevent text wrapping */
     text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
 }
 .upd_del-column {
+    align-content: center;
     width: 70px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
@@ -282,9 +284,78 @@ button:hover{
     text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
 }
 .title-column {
+    align-content: center;
     width: 170.02px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
     white-space: nowrap;         /* Prevent text wrapping */
     text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
+/* CSS */
+.custom-container {
+    padding-left: 15px; /* Adjust as needed */
+    padding-right: 15px; /* Adjust as needed */
+    /* Add any other custom styles here */
+}
+
+/* Correctly target the dropdown toggle when the dropdown is open */
+.navbar-nav .nav-link.active, .navbar-nav .nav-link.show {
+    background-color: rgb(8, 109, 73); /* Desired background color */
+    color: white;               /* Desired text color */
+    transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition */
+}
+
+/* Optional: Change the background color on hover when active */
+.nav-item.dropdown.show > .nav-link.dropdown-toggle:hover{
+    background-color: rgb(8, 109, 73); /* Slightly darker shade for hover effect */
+    color: white;
+}
+
+.nav-item.dropdown-item.active > .nav-link.dropdown-toggle:hover{
+    background-color: rgb(8, 109, 73); /* Slightly darker shade for hover effect */
+    color: white;
+}
+
+.dropdown-item:hover{
+    background-color: rgb(8, 109, 73); /* Slightly darker shade for hover effect */
+    color: white;
+}
+
+.btn-primary{
+    background-color: rgb(8, 109, 73);
+
+}
+.toast-header {
+    background-color: rgb(8, 109, 73); /* Darker header */
+    color: #fff; /* White text *//
+}
+
+.toast-header-error {
+    background-color: #A32424; /* Darker header */
+    color: #fff; /* White text *//
+}
+
+.col-md-4 {
+    width: 20%;
+}
+
+.fixed-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.fixed-button-top {
+    bottom: 70px; /* Adjust position above the existing button */
+    right: 20px;
+}
+.btn-primary:hover {
+    background-color: rgb(6, 77, 52);
+    text-decoration: none; /* Remove any underlines or default hover effects */
+}
+
+.btn:hover {
+
+    text-decoration: none; /* Remove any underlines or default hover effects */
 }

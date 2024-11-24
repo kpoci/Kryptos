@@ -16,6 +16,22 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, Length, Regexp
 
+def is_password_strong(password):
+    # At least 8 characters
+    if len(password) < 8:
+        return False
+    # Contains both uppercase and lowercase letters
+    if not re.search(r'[A-Z]', password) or not re.search(r'[a-z]', password):
+        return False
+    # Contains digits
+    if not re.search(r'\d', password):
+        return False
+    # Contains special characters (excluding spaces)
+    if not re.search(r'[^\w\s]', password):
+        return False
+    # Password is strong
+    return True
+
 def send_email(to_email, subject, message):
     sender_email = "bot067744@gmail.com"
     sender_password = "ytwj euls irhw nrzo"  # Use a real app password or environment-secured password
@@ -1000,6 +1016,137 @@ def update_password(password_id):
         cur.close()
 
     return redirect(url_for('passwordvault'))
+
+@app.route('/delete_key/<int:key_id>', methods=['DELETE'])
+def delete_key(key_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Unauthorized access'}), 401
+
+    user_id = session['user_id']
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+
+    try:
+        # Ensure the key belongs to the logged-in user
+        cur.execute("SELECT key_id FROM `keys` WHERE key_id = %s AND id = %s", (key_id, user_id))
+        key = cur.fetchone()
+
+        if not key:
+            return jsonify({'success': False, 'message': 'Key not found or unauthorized'}), 404
+
+        # Delete all associated passwords
+        cur.execute("DELETE FROM passwords WHERE key_id = %s", (key_id,))
+
+        # Delete the key itself
+        cur.execute("DELETE FROM `keys` WHERE key_id = %s", (key_id,))
+
+        mysql.connection.commit()
+        return jsonify({'success': True, 'message': 'Key and associated data deleted successfully'}), 200
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error deleting key with key_id={key_id}: {str(e)}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the key. Please try again.'}), 500
+    finally:
+        cur.close()
+        
+#SETTINGS ROUTE
+#update email route
+@app.route('/change_email', methods=['POST'])
+def change_email():
+    if 'user_id' not in session:
+        return jsonify({'message': 'User not logged in'}), 401
+    new_email = request.form['email']
+    user_id = session['user_id']
+    cur = mysql.connection.cursor()
+    cur.execute("UPDATE accounts SET email = %s WHERE Id = %s", (new_email, user_id))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': 'Email updated successfully'})
+
+#Update Username Route
+@app.route('/change_username', methods=['POST'])
+def change_username():
+    if 'user_id' not in session:
+        return jsonify({'message': 'User not logged in'}), 401
+    new_username = request.form['username']
+    user_id = session['user_id']
+    cur = mysql.connection.cursor()
+    cur.execute("UPDATE accounts SET username = %s WHERE Id = %s", (new_username, user_id))
+    mysql.connection.commit()
+    cur.close()
+    return jsonify({'message': 'Username updated successfully'})
+
+#Update master password route
+@app.route('/change_master_password', methods=['POST'])
+def change_master_password():
+    if 'user_id' not in session:
+        return jsonify({'message': 'User not logged in'}), 401
+
+    user_id = session['user_id']
+    current_master_password = request.form.get('current_master_password')
+    new_master_password = request.form.get('new_master_password')
+    confirm_master_password = request.form.get('confirm_master_password')
+
+    if new_master_password != confirm_master_password:
+        return jsonify({'message': 'New passwords do not match'}), 400
+
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    try:
+        # Fetch the current master password hash from the database
+        cur.execute("SELECT master_pass FROM accounts WHERE Id = %s", (user_id,))
+        account = cur.fetchone()
+
+        if not account or not ph.verify(account['master_pass'], current_master_password):
+            return jsonify({'message': 'Current master password is incorrect'}), 403
+
+        # Debug print: Current plaintext password (from user input)
+        print(f"Current master password (plaintext): {current_master_password}")
+
+        # Debug print: New plaintext password (from user input)
+        print(f"New master password (plaintext): {new_master_password}")
+
+        # Hash the new master password
+        hashed_new_master_pass = ph.hash(new_master_password)
+
+        # Update the master password in the database
+        cur.execute("UPDATE accounts SET master_pass = %s WHERE Id = %s", (hashed_new_master_pass, user_id))
+        mysql.connection.commit()
+
+        return jsonify({'message': 'Master password updated successfully'})
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error updating master password: {e}")
+        return jsonify({'message': 'Failed to update master password', 'error': str(e)}), 500
+    finally:
+        cur.close()
+        
+# Route to Reset Password
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if 'otp_verified' not in session or 'security_password_verified' not in session or 'reset_email' not in session:
+        flash("Unauthorized access. Please verify OTP and security password first.", "error")
+        return redirect(url_for('recover_password'))
+
+    if request.method == 'POST':
+        new_password = request.form['password']
+        hashed_password = ph.hash(new_password)
+        email = session['reset_email']
+
+        # Update the password and clear the OTP fields
+        cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute("""
+            UPDATE accounts SET password = %s, reset_otp = NULL, reset_otp_expiry = NULL WHERE email = %s
+        """, (hashed_password, email))
+        mysql.connection.commit()
+        cur.close()
+
+        # Clear session variables
+        session.pop('otp_verified', None)
+        session.pop('security_password_verified', None)
+        session.pop('reset_email', None)
+
+        flash("Your password has been reset successfully.", "success")
+        return redirect(url_for('login'))
+    return render_template('reset_password.html')
 
 '''@app.route('/delete_password/<int:password_id>', methods=['DELETE'])
 def delete_password(password_id):
