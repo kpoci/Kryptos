@@ -9,8 +9,10 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import argon2
+import uuid
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 import re
+import traceback
 import logging
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
@@ -101,37 +103,89 @@ def home():
 def index():
     return render_template('login.html')
 
-
-@app.route("/register", methods=["POST", "GET"])
+#Register
+@app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == 'POST':
+        # Retrieve form data
         username = request.form['username']
-        pwd = request.form['password']
         email = request.form['email']
         master_pass = request.form['master_pass']
-        
-        hashed_password = ph.hash(pwd)
+        confirm_master_pass = request.form['confirm_master_pass']
+        security_question = request.form['security_question']
+        security_answer = request.form['security_answer']
+
+        # Validate master password and confirm password match
+        if master_pass != confirm_master_pass:
+            flash("Master passwords do not match.", "error")
+            return redirect(url_for('register'))
+
+        # Validate master password strength
+        if not is_password_strong(master_pass):
+            flash("Master password is not strong enough.", "error")
+            return redirect(url_for('register'))
+
+        # Hash the master password and security answer
         hashed_master_pass = ph.hash(master_pass)
-        
+        hashed_security_answer = ph.hash(security_answer)
+
+        # Generate email verification token (e.g., UUID or random string)
+        email_verification_token = str(uuid.uuid4())
+
+        # Insert the new user into the database with email unverified
         cur = mysql.connection.cursor()
-        cur.execute("INSERT INTO accounts (username, password, email, master_pass) VALUES (%s, %s, %s, %s)", (username, hashed_password, email, hashed_master_pass))
+        cur.execute("""
+            INSERT INTO accounts (username, email, master_pass, security_question, security_answer, email_verified, email_verification_token)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (username, email, hashed_master_pass, security_question, hashed_security_answer, False, email_verification_token))
         mysql.connection.commit()
         cur.close()
+
+        # Send email verification
+        verification_link = url_for('verify_email', token=email_verification_token, _external=True)
+        subject = "Email Verification"
+        message = f"""
+        <p>Hi {username},</p>
+        <p>Please click the link below to verify your email address:</p>
+        <p><a href="{verification_link}">{verification_link}</a></p>
+        <p>Please do not reply to this email. If you did not request this verification, please contact our support team at djl0466@dlsud.edu.ph.</p>
+        <p>Best regards,<br>Kryptos***</p>
+        """
+        send_email(email, subject, message)
+
+        flash("Registration successful! Please check your email to verify your account.", "success")
         return redirect(url_for('login'))
-    
+
     return render_template('register.html')
 
+#verify email
+@app.route('/verify_email/<token>')
+def verify_email(token):
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
+    cur.execute("SELECT * FROM accounts WHERE email_verification_token = %s", (token,))
+    user = cur.fetchone()
+    if user:
+        cur.execute("UPDATE accounts SET email_verified = %s, email_verification_token = NULL WHERE Id = %s", (True, user['Id']))
+        mysql.connection.commit()
+        cur.close()
+        flash("Email verified successfully! You can now log in.", "success")
+        return redirect(url_for('login'))
+    else:
+        cur.close()
+        flash("Invalid or expired verification link.", "error")
+        return redirect(url_for('register'))
+    
 #settings
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
 
-# Login Route with Enhanced Error Handling and Account Lockout Notification
+# Login Route with Enhanced Error Handling, Account Lockout Notification, and Email Verification
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
-        password = request.form['password']
+        master_password = request.form['master_pass']  # Renamed for clarity
 
         try:
             # Fetch user from the database
@@ -141,6 +195,11 @@ def login():
             cur.close()
 
             if user:
+                # Check if email is verified
+                if not user.get('email_verified'):
+                    flash("Please verify your email before logging in.", "error")
+                    return redirect(url_for('login'))
+
                 # Check if account is locked
                 lockout_until = user.get('lockout_until')
                 if lockout_until:
@@ -157,7 +216,7 @@ def login():
 
                 # Proceed with password verification
                 try:
-                    ph.verify(user['password'], password)
+                    ph.verify(user['master_pass'], master_password)
                     # Password is correct
                     # Reset failed attempts on successful login
                     cur = mysql.connection.cursor()
@@ -197,29 +256,44 @@ def login():
                     mysql.connection.commit()
 
                     # Fetch updated failed_attempts
+                    cur = mysql.connection.cursor(DictCursor)
                     cur.execute("SELECT failed_attempts FROM accounts WHERE Id = %s", (user['Id'],))
                     updated_user = cur.fetchone()
-                    failed_attempts = updated_user['failed_attempts']
                     cur.close()
+                    failed_attempts = updated_user['failed_attempts']
 
                     if failed_attempts >= 5:
-                        lockout_until = datetime.now() + timedelta(minutes=1440)  # Lock account for 1 day
-                        cur = mysql.connection.cursor()
-                        cur.execute("UPDATE accounts SET lockout_until = %s WHERE Id = %s", (lockout_until, user['Id']))
-                        mysql.connection.commit()
-                        cur.close()
+                        try:
+                            # Lock account for 1 day
+                            lockout_until = datetime.now() + timedelta(days=1)
+                            lockout_until_str = lockout_until.strftime('%Y-%m-%d %H:%M:%S')
+
+                            cur = mysql.connection.cursor()
+                            cur.execute("UPDATE accounts SET lockout_until = %s WHERE Id = %s", (lockout_until_str, user['Id']))
+                            mysql.connection.commit()
+                            cur.close()
+                        except Exception as e:
+                            print(f"Error updating lockout_until: {e}")
+                            traceback.print_exc()
+                            flash("An error occurred during login. Please try again.", "error")
+                            return redirect(url_for('login'))
 
                         # Send account lockout email notification
-                        subject = "Your Account Has Been Locked"
-                        message = f"""
-                        <p>Dear {user['username']},</p>
-                        <p>Your account has been locked due to 5 invalid login attempts.</p>
-                        <p>If this was not you, please consider changing your password immediately.</p>
-                        <p>You will be able to attempt login again after 1 day.</p>
-                        <p>If you need assistance, please contact our support team at djl0466@dlsud.edu.ph.</p>
-                        <p>Best regards,<br>Kryptos***</p>
-                        """
-                        send_email(user['email'], subject, message)
+                        try:
+                            subject = "Your Account Has Been Locked"
+                            message = f"""
+                            <p>Dear {user['username']},</p>
+                            <p>Your account has been locked due to 5 invalid login attempts.</p>
+                            <p>If this was not you, please consider changing your password immediately.</p>
+                            <p>You will be able to attempt login again after 1 day.</p>
+                            <p>If you need assistance, please contact our support team at djl0466@dlsud.edu.ph.</p>
+                            <p>Best regards,<br>Kryptos***</p>
+                            """
+                            send_email(user['email'], subject, message)
+                        except Exception as e:
+                            print(f"Error sending lockout email: {e}")
+                            traceback.print_exc()
+                            # Decide if you want to proceed even if the email fails
 
                         flash("Account locked due to multiple failed login attempts. Please check your email for more information.", "error")
                     else:
@@ -228,6 +302,7 @@ def login():
                     return redirect(url_for('login'))
                 except Exception as e:
                     print(f"Error during password verification: {e}")
+                    traceback.print_exc()  # This will print the full traceback
                     flash("An error occurred during login. Please try again.", "error")
                     return redirect(url_for('login'))
             else:
@@ -235,11 +310,15 @@ def login():
                 flash("Username not found. Please check and try again.", "error")
                 return redirect(url_for('login'))
         except Exception as e:
-            print(f"Database error: {e}")
+            print(f"Error during login process: {e}")
+            traceback.print_exc()  # This will print the full traceback
             flash("An error occurred during login. Please try again.", "error")
             return redirect(url_for('login'))
 
     return render_template('login.html')
+
+
+
 
 
 
