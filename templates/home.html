@@ -47,7 +47,7 @@
               </li>
                           <!-- Logout Link -->
               <li class="nav-item">
-                  <a class="nav-link" id="logoutButton" href="/logout">Logout</a>
+                  <a class="nav-link btn-danger" id="logoutButton" href="/logout">Logout</a>
                 </li>
               </nav>
     <style>
@@ -96,32 +96,33 @@
     </style>
 </head>
 <body>
-<!-- The Modal -->
-<div class="modal fade" id="inputModal">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <!-- Modal Header -->
-      <div class="modal-header">
-        <h4 class="modal-title fs-5">Enter Key Details</h4>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <!-- Modal body -->
-      <div class="modal-body">
-        <form id="myForm">
-          <div class="mb-3">
-            <label for="keyName">Key Name:</label>
-            <input type="text" class="form-control" id="keyName" name="keyName" required>
-          </div>
-          <div class ="modal-footer">
-          <button type="submit" id="submitBtn" class="btn btn-primary">Submit</button>
-          </div>
-        </form>
+            <!-- Add key Modal -->
+            <!-- The Modal -->
+            <div class="modal fade" id="inputModal">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <h4 class="modal-title fs-5">Enter Key Details</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <!-- Modal body -->
+                <div class="modal-body">
+                    <form id="myForm">
+                    <div class="mb-3">
+                        <label for="keyName">Key Name:</label>
+                        <input type="text" class="form-control" id="keyName" name="keyName" required>
+                    </div>
+                    <div class ="modal-footer">
+                    <button type="submit" id="submitBtn" class="btn btn-primary">Submit</button>
+                    </div>
+                    </form>
 
-      </div>
-    </div>
-  </div>
-</div>
-</div>
+                </div>
+                </div>
+            </div>
+            </div>
+            </div>
    
             <!-- Change Email Modal -->
             <div class="modal fade" id="changeEmailModal" tabindex="-1" role="dialog" aria-labelledby="changeEmailModalLabel" aria-hidden="true">
@@ -276,7 +277,7 @@
             class="btn btn-outline-primary fixed-button fixed-button-top" 
             id="view_keys" 
             data-bs-toggle="modal" 
-            data-bs-target="#keysModal" 
+            data-bs-target="#inputModal" 
             data-bs-placement="left" 
             data-bs-title="Click to add new key">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="20" fill="currentColor" class="bi bi-key-fill" viewBox="0 0 16 16">

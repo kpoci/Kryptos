@@ -1,0 +1,14 @@
+# Flask-specific
+instance/
+*.pyc
+__pycache__/
+
+# Environment Variables
+.env
+
+# VS Code settings
+.vscode/
+
+# Logs
+logs/
+*.log
