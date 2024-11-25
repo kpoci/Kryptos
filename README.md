@@ -1,15 +1,22 @@
 Updated 
 
-Register.html
+recover_password.html
 
-app.register
+verify_reset_otp.html
 
-app.login route
+security_question.html
 
-app.verify email route
+reset_password.html
 
-new files
+new routes
 
-register.css
+recover_password
 
-register.js
+verify_reset_otp
+
+security_question
+
+reset_password
+
+
+
