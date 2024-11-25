@@ -907,14 +907,12 @@ def get_key_id():
     else:
         return jsonify({'error': 'Key not found'}), 404
 
-#NEW UPDATE - DELETE FUNCTION
 @app.route('/delete_password/<int:password_id>', methods=['DELETE'])
 def delete_password(password_id):
-    # Remove the user_id session check for testing
     cur = mysql.connection.cursor()
 
     try:
-        # Attempt to delete the password entry by password_id only
+        # Attempt to delete the password entry by password_id
         cur.execute("DELETE FROM passwords WHERE password_id = %s", (password_id,))
         mysql.connection.commit()
 
@@ -928,7 +926,7 @@ def delete_password(password_id):
     except Exception as e:
         mysql.connection.rollback()
         print(f"Error deleting password: {e}")
-        return jsonify({'success': False, 'message': 'Failed to delete password'}), 500
+        return jsonify({'success': False, 'message': f'Failed to delete password: {str(e)}'}), 500
     finally:
         cur.close()
 

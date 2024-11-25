@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Register Page{% endblock %}
 {% block content %}
+{% with messages = get_flashed_messages(with_categories=True) %}
+{% if messages %}
+    {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+{% endwith %}
 <div class="register-con">
     <h1 class="form-title">Register</h1>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='register.css') }}">
