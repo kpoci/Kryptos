@@ -108,7 +108,7 @@
 <body>
     <div class="verification-container">
         <h2>Two-Step Verification</h2>
-        <p>Please enter the 6-digit OTP code that was sent to your email address: <strong>{{ email }}</strong>.</p>
+        <p>Please enter the 6-digit OTP code that was sent to your email address: <strong id="email" data-email="{{ email }}">{{ email }}</strong>.</p>
         <!-- Form to submit OTP to server -->
         <form method="POST" action="{{ url_for('otp_verification') }}">
             
@@ -154,6 +154,18 @@
                 }
             }, 1000);
         });
+
+        function maskEmail(email) {
+            let [local, domain] = email.split('@');
+            let maskedLocal = local.length > 2 
+                ? local[0] + '*'.repeat(local.length - 2) + local.slice(-1) 
+                : local[0] + '*';
+            return `${maskedLocal}@${domain}`;
+        }
+        
+        const emailElement = document.querySelector('strong');
+        const originalEmail = emailElement.textContent.trim(); // Assuming email is inside a <strong> tag
+        emailElement.textContent = maskEmail(originalEmail);
     </script>
 </body>
 </html>

@@ -22,7 +22,7 @@
         border-radius: 0; /* Remove rounded corners for a full-screen effect */
         overflow: hidden;
     }
-    .left-section {
+    .right-section {
         width: 50%;
         background: #ffffff;
         display: flex;
@@ -31,6 +31,15 @@
         padding: 20px;
         padding-left: 300px;
         margin-top: -100px;
+    }
+    .left-section {
+        width: 50%;
+        background: #ffffff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        margin-top: -1.4%;
     }
     .right-section {
         width: 50%;
@@ -74,10 +83,7 @@
     .theme-text {
         color: rgb(8, 109, 73);
     }
-    .ca-content__article--illustration{
-        padding-top:40px;
-        padding-bottom:50px;
-    }
+    
     .ca-features__list {
         display: grid;
         grid-template-columns: repeat(2, 1fr); /* Creates a 2-column layout */
@@ -92,9 +98,25 @@
     .ca-features--checkmark {
         margin-right: 10px; /* Space between checkmark and text */
     }
-    .ca-features__title{
-        margin-bottom: 25px;
+    .container{
+        background: #ffffff;
+        width: 450px;
+        padding: 1.5rem;
+        margin: 50px auto;
+        border-radius: 10px;
+        height: 500px;
+        margin-top: 100px;
+        box-shadow: 0 2px 4px rgb(171 169 169 / 90%);
+        display: center;
     }
+    .ca-features__title{
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+    .ca-content__article_headerfree{
+        padding-bottom: 20px;
+    }
+
 </style>
 </head>
 <body>
@@ -114,8 +136,10 @@
                             <span class="black-text"><strong>password.</strong></span> 
                         </h1>
                         <h1>
+                            <div class="ca-content__article_headerfree">
                             <span class="theme-text"><strong>Zero</strong></span> 
                             <span class="black-text"><strong>headaches.</strong></span>
+                            </div>
                         </h1>
                     </div>
                     <!-- Illustration -->
@@ -160,6 +184,7 @@
     </div>
 
     <!-- Right Section -->
+     <div class ="right-section">
         <div class="container" id="signin">
             <h1 class="form-title">Kry<span style="color: rgb(8, 109, 73);">ptos***</span></h1>
             
@@ -195,5 +220,7 @@
                 <p><a class="link-opacity-50-hover link-underline-opacity-50" href="register">Register</a></p>
             </div>
         </div>
+    </div>
+</div>
         <script src="{{ url_for('static', filename='script.js') }}"></script>
 {% endblock %}
