@@ -1,20 +1,5 @@
 Updated 
 
-<<<<<<< HEAD
-Register.html
-
-app.register
-
-app.login route
-
-app.verify email route
-
-new files
-
-register.css
-
-register.js
-=======
 recover_password.html
 
 verify_reset_otp.html
@@ -47,4 +32,3 @@ update security question and answer
 
 
 
->>>>>>> repo-a/main

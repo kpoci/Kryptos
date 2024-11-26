@@ -1,18 +1,3 @@
-<<<<<<< HEAD
-=======
-const signUpButton=document.getElementById('signUpButton');
-const signInButton=document.getElementById('button');
-const signInForm=document.getElementById('signin');
-const signUpForm=document.getElementById('signup');
-
-signUpButton.addEventListener('click', function() {
-    window.location.href = '/register';
-})
-signInButton.addEventListener('click', function() {
-    console.log("Sign in button clicked");
-    window.location.href = '/';
-})
->>>>>>> repo-a/main
 
 $(document).ready(function() {
     console.log("Document is ready.");

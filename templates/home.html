@@ -42,11 +42,7 @@
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeEmailModal">Change Email</a></li>
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeUsernameModal">Change Username</a></li>
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeMasterPasswordModal">Change Master Password</a></li>
-<<<<<<< HEAD
-                  <li><a class="dropdown-item" href="#">Recover Password</a></li>
-=======
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#updateSecurityModal">Update Security Question</a></li>
->>>>>>> repo-a/main
                 </ul>
               </li>
                           <!-- Logout Link -->
@@ -54,14 +50,11 @@
                   <a class="nav-link btn-danger" id="logoutButton" href="/logout">Logout</a>
                 </li>
               </nav>
-<<<<<<< HEAD
-=======
               {% if user_new_email %}
               <div class="alert alert-info text-center">
                   A verification email has been sent to {{ user_new_email }}. Please verify your new email address.
               </div>
               {% endif %}
->>>>>>> repo-a/main
     <style>
         .card-container {
             display: flex;
@@ -224,8 +217,6 @@
 
         </div>
       </div>
-<<<<<<< HEAD
-=======
             <!-- Update Security Question Modal -->
         <div class="modal fade" id="updateSecurityModal" tabindex="-1" role="dialog" aria-labelledby="updateSecurityModalLabel" aria-hidden="true">
             <div class="modal-dialog" role="document">
@@ -270,7 +261,6 @@
             </div>
             </div>
         </div>
->>>>>>> repo-a/main
 
                 <!-- Success Toast -->
                 <div id="successToast" 
@@ -642,15 +632,9 @@
             // Change Email Form Submission
             document.getElementById('changeEmailForm').addEventListener('submit', function (event) {
                 event.preventDefault(); // Prevent default form submission
-<<<<<<< HEAD
-        
-                const newEmail = document.getElementById('newEmail').value;
-        
-=======
 
                 const newEmail = document.getElementById('newEmail').value;
 
->>>>>>> repo-a/main
                 fetch('/change_email', {
                     method: 'POST',
                     headers: {
@@ -661,93 +645,30 @@
                     }),
                 })
                     .then(response => {
-<<<<<<< HEAD
-                        // Save the response for checking .ok
                         if (!response.ok) {
-                            // Parse and handle error response
-=======
-                        if (!response.ok) {
->>>>>>> repo-a/main
                             return response.json().then(data => {
                                 showToast('errorToast', data.message || 'Failed to update email.');
                                 throw new Error(data.message || 'Failed to update email.');
                             });
                         }
-<<<<<<< HEAD
-                        return response.json(); // Parse successful response
-                    })
-                    .then(data => {
-                        // Show success toast
-                        showToast('successToast', data.message || 'Email updated successfully.');
-        
-=======
                         return response.json();
                     })
                     .then(data => {
                         // Show success toast
                         showToast('successToast', data.message || 'Verification email sent.');
 
->>>>>>> repo-a/main
                         // Close modal and reset form
                         const modal = bootstrap.Modal.getInstance(document.getElementById('changeEmailModal'));
                         modal.hide();
                         document.getElementById('changeEmailForm').reset();
-<<<<<<< HEAD
-=======
 
                         // Optionally, update the UI to reflect the pending email change
->>>>>>> repo-a/main
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         showToast('errorToast', error.message || 'An unexpected error occurred.');
                     });
             });
-<<<<<<< HEAD
-        
-            // Change Username Form Submission
-            document.getElementById('changeUsernameForm').addEventListener('submit', function (event) {
-                event.preventDefault(); // Prevent default form submission
-        
-                const newUsername = document.getElementById('newUsername').value;
-        
-                fetch('/change_username', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: new URLSearchParams({
-                        username: newUsername,
-                    }),
-                })
-                    .then(response => {
-                        // Save the response for checking .ok
-                        if (!response.ok) {
-                            // Parse and handle error response
-                            return response.json().then(data => {
-                                showToast('errorToast', data.message || 'Failed to update username.');
-                                throw new Error(data.message || 'Failed to update username.');
-                            });
-                        }
-                        return response.json(); // Parse successful response
-                    })
-                    .then(data => {
-                        // Show success toast
-                        showToast('successToast', data.message || 'Username updated successfully.');
-        
-                        // Close modal and reset form
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('changeUsernameModal'));
-                        modal.hide();
-                        document.getElementById('changeUsernameForm').reset();
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        showToast('errorToast', error.message || 'An unexpected error occurred.');
-                    });
-            });
-        });
-        
-=======
 
             // Change Username Form Submission
         document.getElementById('changeUsernameForm').addEventListener('submit', function (event) {
@@ -791,7 +712,6 @@
         });
     });
         // Change Master password
->>>>>>> repo-a/main
         document.getElementById('changeMasterPasswordForm').addEventListener('submit', function (event) {
             event.preventDefault(); // Prevent default form submission
         
@@ -841,8 +761,6 @@
                 });
         });
         
-<<<<<<< HEAD
-=======
         // Update Security Question Form Submission
         document.getElementById('updateSecurityForm').addEventListener('submit', function (event) {
             event.preventDefault(); // Prevent default form submission
@@ -902,7 +820,6 @@
         });
    
         
->>>>>>> repo-a/main
 // Toast utility function
 function showToast(toastId, message) {
     const toastElement = document.getElementById(toastId);
@@ -917,8 +834,4 @@ function showToast(toastId, message) {
     </script>
 
 </body>
-<<<<<<< HEAD
 </html>
-=======
-</html>
->>>>>>> repo-a/main
