@@ -3,6 +3,10 @@ import MySQLdb
 from MySQLdb.cursors import DictCursor
 from flask_mysqldb import MySQL
 from argon2 import PasswordHasher
+<<<<<<< HEAD
+=======
+from argon2 import exceptions
+>>>>>>> repo-a/main
 from cryptography.fernet import Fernet, InvalidToken
 import random
 import smtplib
@@ -125,6 +129,29 @@ def register():
             flash("Master password is not strong enough.", "error")
             return redirect(url_for('register'))
 
+<<<<<<< HEAD
+=======
+        # **Check if username already exists**
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("SELECT Id FROM accounts WHERE username = %s", (username,))
+        user_with_same_username = cur.fetchone()
+        cur.close()
+
+        if user_with_same_username:
+            flash("Username already exists. Please choose a different username.", "error")
+            return redirect(url_for('register'))
+
+        # **Check if email already exists**
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("SELECT Id FROM accounts WHERE email = %s", (email,))
+        user_with_same_email = cur.fetchone()
+        cur.close()
+
+        if user_with_same_email:
+            flash("Email already registered. Please use a different email address.", "error")
+            return redirect(url_for('register'))
+
+>>>>>>> repo-a/main
         # Hash the master password and security answer
         hashed_master_pass = ph.hash(master_pass)
         hashed_security_answer = ph.hash(security_answer)
@@ -133,6 +160,7 @@ def register():
         email_verification_token = str(uuid.uuid4())
 
         # Insert the new user into the database with email unverified
+<<<<<<< HEAD
         cur = mysql.connection.cursor()
         cur.execute("""
             INSERT INTO accounts (username, email, master_pass, security_question, security_answer, email_verified, email_verification_token)
@@ -140,6 +168,20 @@ def register():
         """, (username, email, hashed_master_pass, security_question, hashed_security_answer, False, email_verification_token))
         mysql.connection.commit()
         cur.close()
+=======
+        try:
+            cur = mysql.connection.cursor()
+            cur.execute("""
+                INSERT INTO accounts (username, email, master_pass, security_question, security_answer, email_verified, email_verification_token)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (username, email, hashed_master_pass, security_question, hashed_security_answer, False, email_verification_token))
+            mysql.connection.commit()
+            cur.close()
+        except Exception as e:
+            print(f"Error inserting new user: {e}")
+            flash("An error occurred during registration. Please try again.", "error")
+            return redirect(url_for('register'))
+>>>>>>> repo-a/main
 
         # Send email verification
         verification_link = url_for('verify_email', token=email_verification_token, _external=True)
@@ -175,6 +217,200 @@ def verify_email(token):
         flash("Invalid or expired verification link.", "error")
         return redirect(url_for('register'))
     
+<<<<<<< HEAD
+=======
+#recover password
+@app.route('/recover_password', methods=['GET', 'POST'])
+def recover_password():
+    if request.method == 'POST':
+        email = request.form['email']
+        try:
+            # Check if email exists in the database
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute("SELECT * FROM accounts WHERE email = %s", (email,))
+            user = cur.fetchone()
+            cur.close()
+
+            if user:
+                # Generate OTP and expiry time
+                otp = random.randint(100000, 999999)
+                otp_expiry = datetime.now() + timedelta(minutes=5)
+
+                # Update reset_otp and reset_otp_expiry in the database
+                cur = mysql.connection.cursor()
+                cur.execute("UPDATE accounts SET reset_otp = %s, reset_otp_expiry = %s WHERE email = %s",
+                            (otp, otp_expiry, email))
+                mysql.connection.commit()
+                cur.close()
+
+                # Send OTP email
+                subject = "Your Password Reset OTP"
+                message = f"""
+                <p>Dear {user['username']},</p>
+                <p>Your OTP for password reset is: <strong>{otp}</strong></p>
+                <p>This OTP is valid for the next 5 minutes.</p>
+                <p>Please do not reply to this email. If you did not request this, please ignore this email.</p>
+                <p>Best regards,<br>Kryptos</p>
+                """
+                send_email(email, subject, message)
+
+                flash("An OTP has been sent to your email address.", "success")
+                session['reset_email'] = email  # Store email in session for the next steps
+                return redirect(url_for('verify_reset_otp'))
+            else:
+                flash("Email address not found.", "error")
+                return redirect(url_for('recover_password'))
+        except Exception as e:
+            print(f"Error during password recovery: {e}")
+            flash("An error occurred. Please try again.", "error")
+            return redirect(url_for('recover_password'))
+
+    return render_template('recover_password.html')   
+
+#verify reset OTP
+@app.route('/verify_reset_otp', methods=['GET', 'POST'])
+def verify_reset_otp():
+    if 'reset_email' not in session:
+        flash("Session expired. Please start the password recovery process again.", "error")
+        return redirect(url_for('recover_password'))
+
+    if request.method == 'POST':
+        otp_input = request.form['otp']
+        email = session['reset_email']
+
+        try:
+            # Fetch the OTP and expiry from the database
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute("SELECT reset_otp, reset_otp_expiry FROM accounts WHERE email = %s", (email,))
+            user = cur.fetchone()
+            cur.close()
+
+            if user:
+                reset_otp = user['reset_otp']
+                reset_otp_expiry = user['reset_otp_expiry']
+
+                # Check if OTP is valid and not expired
+                if reset_otp == otp_input and datetime.now() < reset_otp_expiry:
+                    session['otp_verified'] = True
+                    return redirect(url_for('security_question'))
+                else:
+                    flash("Invalid or expired OTP. Please try again.", "error")
+                    return redirect(url_for('verify_reset_otp'))
+            else:
+                flash("User not found.", "error")
+                return redirect(url_for('recover_password'))
+        except Exception as e:
+            print(f"Error during OTP verification: {e}")
+            flash("An error occurred. Please try again.", "error")
+            return redirect(url_for('verify_reset_otp'))
+
+    return render_template('verify_reset_otp.html')
+
+#security question
+@app.route('/security_question', methods=['GET', 'POST'])
+def security_question():
+    if 'otp_verified' not in session or 'reset_email' not in session:
+        flash("Session expired. Please start the password recovery process again.", "error")
+        return redirect(url_for('recover_password'))
+
+    email = session['reset_email']
+
+    try:
+        # Fetch the security question from the database
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("SELECT security_question FROM accounts WHERE email = %s", (email,))
+        user = cur.fetchone()
+        cur.close()
+
+        if user:
+            security_question = user['security_question']
+        else:
+            flash("User not found.", "error")
+            return redirect(url_for('recover_password'))
+    except Exception as e:
+        print(f"Error fetching security question: {e}")
+        flash("An error occurred. Please try again.", "error")
+        return redirect(url_for('recover_password'))
+
+    if request.method == 'POST':
+        security_answer_input = request.form['security_answer']
+
+        try:
+            # Fetch the hashed security answer from the database
+            cur = mysql.connection.cursor(DictCursor)
+            cur.execute("SELECT security_answer FROM accounts WHERE email = %s", (email,))
+            user = cur.fetchone()
+            cur.close()
+
+            if user:
+                security_answer_hash = user['security_answer']
+
+                # Use ph.verify to compare the input with the hashed answer
+                try:
+                    ph.verify(security_answer_hash, security_answer_input)
+                    session['security_verified'] = True
+                    return redirect(url_for('reset_password'))
+                except exceptions.VerifyMismatchError:
+                    # Incorrect security answer
+                    flash("Incorrect security answer. Please try again.", "error")
+                    return redirect(url_for('security_question'))
+                except Exception as e:
+                    # Handle other exceptions
+                    print(f"Error during security answer verification: {e}")
+                    flash("An error occurred. Please try again.", "error")
+                    return redirect(url_for('security_question'))
+            else:
+                flash("User not found.", "error")
+                return redirect(url_for('recover_password'))
+        except Exception as e:
+            print(f"Error during security answer verification: {e}")
+            flash("An error occurred. Please try again.", "error")
+            return redirect(url_for('security_question'))
+
+    return render_template('security_question.html', security_question=security_question)
+
+#reset_password
+@app.route('/reset_password', methods=['GET', 'POST'])
+def reset_password():
+    if 'security_verified' not in session or 'reset_email' not in session:
+        flash("Session expired. Please start the password recovery process again.", "error")
+        return redirect(url_for('recover_password'))
+
+    email = session['reset_email']
+
+    if request.method == 'POST':
+        new_password = request.form['new_password']
+        confirm_password = request.form['confirm_password']
+
+        if new_password != confirm_password:
+            flash("Passwords do not match. Please try again.", "error")
+            return redirect(url_for('reset_password'))
+
+        try:
+            # Hash the new password
+            hashed_password = ph.hash(new_password)
+
+            # Update the user's password in the database
+            cur = mysql.connection.cursor()
+            cur.execute("UPDATE accounts SET master_pass = %s WHERE email = %s", (hashed_password, email))
+            mysql.connection.commit()
+            cur.close()
+
+            # Clear the session variables
+            session.pop('reset_email', None)
+            session.pop('otp_verified', None)
+            session.pop('security_verified', None)
+
+            flash("Your password has been reset successfully. You can now log in.", "success")
+            return redirect(url_for('login'))
+        except Exception as e:
+            print(f"Error resetting password: {e}")
+            flash("An error occurred. Please try again.", "error")
+            return redirect(url_for('reset_password'))
+
+    return render_template('reset_password.html')
+
+>>>>>>> repo-a/main
 #settings
 @app.route('/settings')
 def settings():
@@ -388,6 +624,7 @@ def otp_verification():
 
     return render_template('otp_verification.html', email=email, form=form, resend_form=resend_form)
 
+<<<<<<< HEAD
 #Route to Request Password Reset       
 @app.route('/recover_password', methods=['GET', 'POST'])
 def recover_password():
@@ -429,6 +666,9 @@ def recover_password():
             flash("Email not found.", "error")
             return redirect(url_for('recover_password'))
     return render_template('recover_password.html')
+=======
+
+>>>>>>> repo-a/main
 
 # Resend OTP Route
 @app.route('/resend_otp', methods=['GET','POST'])
@@ -476,6 +716,7 @@ def resend_otp():
     finally:
         cur.close()
         
+<<<<<<< HEAD
 # Route to Verify OTP and Proceed to Security Password Verification
 @app.route('/verify_reset_otp', methods=['GET', 'POST'])
 def verify_reset_otp():
@@ -503,6 +744,8 @@ def verify_reset_otp():
             flash("Invalid or expired OTP. Please try again.", "error")
             return redirect(url_for('verify_reset_otp'))
     return render_template('verify_reset_otp.html')
+=======
+>>>>>>> repo-a/main
 
 #resend otp
 
@@ -1131,6 +1374,7 @@ def delete_key(key_id):
 def change_email():
     if 'user_id' not in session:
         return jsonify({'message': 'User not logged in'}), 401
+<<<<<<< HEAD
     new_email = request.form['email']
     user_id = session['user_id']
     cur = mysql.connection.cursor()
@@ -1138,12 +1382,88 @@ def change_email():
     mysql.connection.commit()
     cur.close()
     return jsonify({'message': 'Email updated successfully'})
+=======
+
+    new_email = request.form['email']
+    user_id = session['user_id']
+
+    # Check if the new email is already in use
+    cur = mysql.connection.cursor(DictCursor)
+    cur.execute("SELECT Id FROM accounts WHERE email = %s", (new_email,))
+    existing_user = cur.fetchone()
+    if existing_user:
+        cur.close()
+        return jsonify({'message': 'Email is already in use. Please use a different email address.'}), 400
+
+    # Generate a new email verification token
+    email_verification_token = str(uuid.uuid4())
+
+    # Update the user's record with new_email and email_verification_token
+    try:
+        cur.execute("""
+            UPDATE accounts
+            SET new_email = %s, email_verification_token = %s
+            WHERE Id = %s
+        """, (new_email, email_verification_token, user_id))
+        mysql.connection.commit()
+    except Exception as e:
+        print(f"Error updating email: {e}")
+        return jsonify({'message': 'An error occurred while updating the email.'}), 500
+    finally:
+        cur.close()
+
+    # Send a verification email to the new email address
+    verification_link = url_for('verify_new_email', token=email_verification_token, _external=True)
+    subject = "Email Verification for Email Change"
+    message = f"""
+    <p>Hi,</p>
+    <p>You have requested to change your email address. Please click the link below to verify your new email address:</p>
+    <p><a href="{verification_link}">{verification_link}</a></p>
+    <p>If you did not request this change, please ignore this email.</p>
+    <p>Best regards,<br>Kryptos***</p>
+    """
+    try:
+        send_email(new_email, subject, message)
+    except Exception as e:
+        print(f"Error sending verification email: {e}")
+        return jsonify({'message': 'Failed to send verification email. Please try again later.'}), 500
+
+    return jsonify({'message': 'A verification email has been sent to your new email address. Please verify to complete the email change.'}), 200
+
+#verify new email
+@app.route('/verify_new_email/<token>', methods=['GET'])
+def verify_new_email(token):
+    cur = mysql.connection.cursor(DictCursor)
+    try:
+        # Find the user with the matching verification token
+        cur.execute("SELECT Id, new_email FROM accounts WHERE email_verification_token = %s", (token,))
+        user = cur.fetchone()
+
+        if user:
+            # Update the email and clear temporary fields
+            cur.execute("""
+                UPDATE accounts
+                SET email = %s, new_email = NULL, email_verification_token = NULL
+                WHERE Id = %s
+            """, (user['new_email'], user['Id']))
+            mysql.connection.commit()
+            flash("Your email address has been updated successfully.", "success")
+        else:
+            flash("Invalid or expired verification link.", "error")
+    except Exception as e:
+        print(f"Error verifying new email: {e}")
+        flash("An error occurred during email verification.", "error")
+    finally:
+        cur.close()
+    return redirect(url_for('home'))
+>>>>>>> repo-a/main
 
 #Update Username Route
 @app.route('/change_username', methods=['POST'])
 def change_username():
     if 'user_id' not in session:
         return jsonify({'message': 'User not logged in'}), 401
+<<<<<<< HEAD
     new_username = request.form['username']
     user_id = session['user_id']
     cur = mysql.connection.cursor()
@@ -1151,6 +1471,37 @@ def change_username():
     mysql.connection.commit()
     cur.close()
     return jsonify({'message': 'Username updated successfully'})
+=======
+
+    new_username = request.form['username']
+    user_id = session['user_id']
+
+    # Input validation (optional)
+    if not new_username:
+        return jsonify({'message': 'Username cannot be empty.'}), 400
+
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+
+        # Check if the new username already exists
+        cur.execute("SELECT Id FROM accounts WHERE username = %s", (new_username,))
+        existing_user = cur.fetchone()
+
+        if existing_user:
+            cur.close()
+            return jsonify({'message': 'Username already exists. Please choose a different username.'}), 400
+
+        # Update the username
+        cur.execute("UPDATE accounts SET username = %s WHERE Id = %s", (new_username, user_id))
+        mysql.connection.commit()
+        cur.close()
+
+        return jsonify({'message': 'Username updated successfully'}), 200
+
+    except Exception as e:
+        print(f"Error updating username: {e}")
+        return jsonify({'message': 'An error occurred while updating the username.'}), 500
+>>>>>>> repo-a/main
 
 #Update master password route
 @app.route('/change_master_password', methods=['POST'])
@@ -1196,6 +1547,7 @@ def change_master_password():
     finally:
         cur.close()
         
+<<<<<<< HEAD
 # Route to Reset Password
 @app.route('/reset_password', methods=['GET', 'POST'])
 def reset_password():
@@ -1224,6 +1576,57 @@ def reset_password():
         flash("Your password has been reset successfully.", "success")
         return redirect(url_for('login'))
     return render_template('reset_password.html')
+=======
+#update_security_question
+@app.route('/update_security_question', methods=['POST'])
+def update_security_question():
+    if 'user_id' not in session:
+        return jsonify({'message': 'User not logged in'}), 401
+
+    user_id = session['user_id']
+    current_master_password = request.form['current_master_password']
+    new_security_question = request.form['new_security_question']
+    new_security_answer = request.form['new_security_answer']
+
+    # Input validation
+    if not all([current_master_password, new_security_question, new_security_answer]):
+        return jsonify({'message': 'All fields are required.'}), 400
+
+    try:
+        # Fetch the user's current master password hash
+        cur = mysql.connection.cursor(DictCursor)
+        cur.execute("SELECT master_pass FROM accounts WHERE Id = %s", (user_id,))
+        user = cur.fetchone()
+        cur.close()
+
+        if not user:
+            return jsonify({'message': 'User not found.'}), 404
+
+        # Verify the current master password
+        try:
+            ph.verify(user['master_pass'], current_master_password)
+        except exceptions.VerifyMismatchError:
+            return jsonify({'message': 'Incorrect master password.'}), 403
+
+        # Hash the new security answer
+        hashed_security_answer = ph.hash(new_security_answer)
+
+        # Update the security question and answer in the database
+        cur = mysql.connection.cursor()
+        cur.execute("""
+            UPDATE accounts
+            SET security_question = %s, security_answer = %s
+            WHERE Id = %s
+        """, (new_security_question, hashed_security_answer, user_id))
+        mysql.connection.commit()
+        cur.close()
+
+        return jsonify({'message': 'Security question and answer updated successfully.'}), 200
+
+    except Exception as e:
+        print(f"Error updating security question: {e}")
+        return jsonify({'message': 'An error occurred while updating the security question.'}), 500
+>>>>>>> repo-a/main
 
 '''@app.route('/delete_password/<int:password_id>', methods=['DELETE'])
 def delete_password(password_id):

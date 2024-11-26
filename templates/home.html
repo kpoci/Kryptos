@@ -42,7 +42,11 @@
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeEmailModal">Change Email</a></li>
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeUsernameModal">Change Username</a></li>
                   <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#changeMasterPasswordModal">Change Master Password</a></li>
+<<<<<<< HEAD
                   <li><a class="dropdown-item" href="#">Recover Password</a></li>
+=======
+                  <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#updateSecurityModal">Update Security Question</a></li>
+>>>>>>> repo-a/main
                 </ul>
               </li>
                           <!-- Logout Link -->
@@ -50,6 +54,14 @@
                   <a class="nav-link btn-danger" id="logoutButton" href="/logout">Logout</a>
                 </li>
               </nav>
+<<<<<<< HEAD
+=======
+              {% if user_new_email %}
+              <div class="alert alert-info text-center">
+                  A verification email has been sent to {{ user_new_email }}. Please verify your new email address.
+              </div>
+              {% endif %}
+>>>>>>> repo-a/main
     <style>
         .card-container {
             display: flex;
@@ -212,6 +224,53 @@
 
         </div>
       </div>
+<<<<<<< HEAD
+=======
+            <!-- Update Security Question Modal -->
+        <div class="modal fade" id="updateSecurityModal" tabindex="-1" role="dialog" aria-labelledby="updateSecurityModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form id="updateSecurityForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="updateSecurityModalLabel">Update Security Question and Answer</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Current Master Password Field -->
+                    <div class="mb-3">
+                    <label for="currentMasterPasswordForSecurity">Current Master Password:</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="currentMasterPasswordForSecurity" required>
+                        <span class="input-group-text">
+                        <i class="far fa-eye" id="toggleMasterPasswordVisibility" style="cursor: pointer;"></i>
+                        </span>
+                    </div>
+                    </div>
+                    <!-- Security Question Dropdown -->
+                    <div class="mb-3">
+                    <label for="newSecurityQuestion">New Security Question:</label>
+                    <select class="form-control" id="newSecurityQuestion" required>
+                        <option value="" disabled selected>Select a Security Question</option>
+                        <option value="mother_maiden_name">What is your mother's maiden name?</option>
+                        <option value="first_pet">What was the name of your first pet?</option>
+                        <option value="favorite_teacher">Who was your favorite teacher?</option>
+                        <!-- Add more questions as needed -->
+                    </select>
+                    </div>
+                    <!-- Security Answer Field -->
+                    <div class="mb-3">
+                    <label for="newSecurityAnswer">New Security Answer:</label>
+                    <input type="text" class="form-control" id="newSecurityAnswer" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Update Security Question</button>
+                </div>
+                </form>
+            </div>
+            </div>
+        </div>
+>>>>>>> repo-a/main
 
                 <!-- Success Toast -->
                 <div id="successToast" 
@@ -583,9 +642,15 @@
             // Change Email Form Submission
             document.getElementById('changeEmailForm').addEventListener('submit', function (event) {
                 event.preventDefault(); // Prevent default form submission
+<<<<<<< HEAD
         
                 const newEmail = document.getElementById('newEmail').value;
         
+=======
+
+                const newEmail = document.getElementById('newEmail').value;
+
+>>>>>>> repo-a/main
                 fetch('/change_email', {
                     method: 'POST',
                     headers: {
@@ -596,30 +661,49 @@
                     }),
                 })
                     .then(response => {
+<<<<<<< HEAD
                         // Save the response for checking .ok
                         if (!response.ok) {
                             // Parse and handle error response
+=======
+                        if (!response.ok) {
+>>>>>>> repo-a/main
                             return response.json().then(data => {
                                 showToast('errorToast', data.message || 'Failed to update email.');
                                 throw new Error(data.message || 'Failed to update email.');
                             });
                         }
+<<<<<<< HEAD
                         return response.json(); // Parse successful response
                     })
                     .then(data => {
                         // Show success toast
                         showToast('successToast', data.message || 'Email updated successfully.');
         
+=======
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Show success toast
+                        showToast('successToast', data.message || 'Verification email sent.');
+
+>>>>>>> repo-a/main
                         // Close modal and reset form
                         const modal = bootstrap.Modal.getInstance(document.getElementById('changeEmailModal'));
                         modal.hide();
                         document.getElementById('changeEmailForm').reset();
+<<<<<<< HEAD
+=======
+
+                        // Optionally, update the UI to reflect the pending email change
+>>>>>>> repo-a/main
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         showToast('errorToast', error.message || 'An unexpected error occurred.');
                     });
             });
+<<<<<<< HEAD
         
             // Change Username Form Submission
             document.getElementById('changeUsernameForm').addEventListener('submit', function (event) {
@@ -663,6 +747,51 @@
             });
         });
         
+=======
+
+            // Change Username Form Submission
+        document.getElementById('changeUsernameForm').addEventListener('submit', function (event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const newUsername = document.getElementById('newUsername').value;
+
+            fetch('/change_username', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    username: newUsername,
+                }),
+            })
+                .then(response => {
+                    // Save the response for checking .ok
+                    if (!response.ok) {
+                        // Parse and handle error response
+                        return response.json().then(data => {
+                            showToast('errorToast', data.message || 'Failed to update username.');
+                            throw new Error(data.message || 'Failed to update username.');
+                        });
+                    }
+                    return response.json(); // Parse successful response
+                })
+                .then(data => {
+                    // Show success toast
+                    showToast('successToast', data.message || 'Username updated successfully.');
+
+                    // Close modal and reset form
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('changeUsernameModal'));
+                    modal.hide();
+                    document.getElementById('changeUsernameForm').reset();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // The error toast is already displayed in the error handling above
+                });
+        });
+    });
+        // Change Master password
+>>>>>>> repo-a/main
         document.getElementById('changeMasterPasswordForm').addEventListener('submit', function (event) {
             event.preventDefault(); // Prevent default form submission
         
@@ -712,6 +841,68 @@
                 });
         });
         
+<<<<<<< HEAD
+=======
+        // Update Security Question Form Submission
+        document.getElementById('updateSecurityForm').addEventListener('submit', function (event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const currentMasterPassword = document.getElementById('currentMasterPasswordForSecurity').value;
+            const newSecurityQuestion = document.getElementById('newSecurityQuestion').value;
+            const newSecurityAnswer = document.getElementById('newSecurityAnswer').value;
+
+            fetch('/update_security_question', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+                current_master_password: currentMasterPassword,
+                new_security_question: newSecurityQuestion,
+                new_security_answer: newSecurityAnswer,
+            }),
+            })
+            .then(response => {
+                if (!response.ok) {
+                return response.json().then(data => {
+                    showToast('errorToast', data.message || 'Failed to update security question.');
+                    throw new Error(data.message || 'Failed to update security question.');
+                });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Show success toast
+                showToast('successToast', data.message || 'Security question updated successfully.');
+
+                // Close modal and reset form
+                const modal = bootstrap.Modal.getInstance(document.getElementById('updateSecurityModal'));
+                modal.hide();
+                document.getElementById('updateSecurityForm').reset();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('errorToast', error.message || 'An unexpected error occurred.');
+            });
+        });
+
+        // Toggle visibility of current master password in update security question modal
+        document.getElementById('toggleMasterPasswordVisibility').addEventListener('click', function () {
+            const passwordField = document.getElementById('currentMasterPasswordForSecurity');
+            const icon = this;
+            if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+            } else {
+            passwordField.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+            }
+        });
+   
+        
+>>>>>>> repo-a/main
 // Toast utility function
 function showToast(toastId, message) {
     const toastElement = document.getElementById(toastId);
@@ -726,4 +917,8 @@ function showToast(toastId, message) {
     </script>
 
 </body>
+<<<<<<< HEAD
 </html>
+=======
+</html>
+>>>>>>> repo-a/main
