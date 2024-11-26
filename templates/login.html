@@ -2,9 +2,9 @@
 {% block title %} Login Page {% endblock %}
 {% block content %}
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Inria+Sans:wght@400;600&display=swap" rel="stylesheet">
 <style>
-    body {
-        font-family: Arial, sans-serif;
+    body {;
         height: 100vh;
         margin: 0;
         display: flex;
@@ -30,6 +30,7 @@
         align-items: center;
         padding: 20px;
         padding-left: 300px;
+        margin-top: -100px;
     }
     .right-section {
         width: 50%;
@@ -67,6 +68,33 @@
     .links a:hover {
         text-decoration: underline;
     }
+    .black-text {
+        color: black;
+    }
+    .theme-text {
+        color: rgb(8, 109, 73);
+    }
+    .ca-content__article--illustration{
+        padding-top:40px;
+        padding-bottom:50px;
+    }
+    .ca-features__list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* Creates a 2-column layout */
+        gap: 20px; /* Adds space between grid items */
+    }
+    
+    .ca-features__item {
+        display: flex;
+        align-items: center; /* Centers content vertically */
+    }
+    
+    .ca-features--checkmark {
+        margin-right: 10px; /* Space between checkmark and text */
+    }
+    .ca-features__title{
+        margin-bottom: 25px;
+    }
 </style>
 </head>
 <body>
@@ -82,70 +110,46 @@
                     <!-- Header -->
                     <div class="ca-content__article--header free">
                         <h1>
-                            <span>One password</span>
-                            <br />
-                            <span>Zero headaches</span>
+                            <span class="theme-text"><strong>One</strong></span> 
+                            <span class="black-text"><strong>password.</strong></span> 
                         </h1>
-                        <h3>
-                            Kryptos takes care of the rest.
-                        </h3>
+                        <h1>
+                            <span class="theme-text"><strong>Zero</strong></span> 
+                            <span class="black-text"><strong>headaches.</strong></span>
+                        </h1>
                     </div>
-                    
                     <!-- Illustration -->
                     <div class="ca-content__article--illustration">
                         <img src="{{ url_for('static', filename='illustration.png') }}" class="img-thumbnail" alt="Illustration" 
                         style="width: 430px; height: 266.25px; object-fit: cover;"/>
                         
                     </div>
-
+                    
+                    <div class="ca-features__title">
+                        <h3>
+                            <span class="black-text"><strong>Features</strong></span> 
+                        </h3>
+                    </div>
                     <!-- Features Section -->
                     <div class="ca-features-container">
                         <div class="ca-features">
-                            <span class="ca-features--title">Free features</span>
+
                             <ul class="ca-features__list">
                                 <li class="ca-features__item">
                                     <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Secure password vault</span>
+                                    <span class="ca-features--description">Encrypted password vault</span>
                                 </li>
                                 <li class="ca-features__item">
                                     <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Access on one device type</span>
+                                    <span class="ca-features--description">Strong Password Generator</span>
                                 </li>
                                 <li class="ca-features__item">
                                     <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">One-to-one sharing</span>
+                                    <span class="ca-features--description">Two-Step Verification</span>
                                 </li>
                                 <li class="ca-features__item">
                                     <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Save and fill passwords</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Password generator</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Secure notes</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Security Dashboard and Score</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Dark Web Monitoring</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Basic Support</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">Multifactor authentication</span>
-                                </li>
-                                <li class="ca-features__item">
-                                    <span class="ca-features--checkmark">✔</span>
-                                    <span class="ca-features--description">LastPass Authenticator</span>
+                                    <span class="ca-features--description">Browser & Desktop Only</span>
                                 </li>
                             </ul>
                         </div>
