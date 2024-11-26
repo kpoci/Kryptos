@@ -8,12 +8,15 @@ body{
     background-color: #f9fbfd;
 }
 .container{
-    background:#fff;
+    background:#ffffff;
     width:450px;
     padding:1.5rem;
     margin:50px auto;
     border-radius:10px;
-    box-shadow:0 20px 35px rgba(0,0,1,0.9);
+    height: 500px;
+    margin-top: 100px;
+    box-shadow: 0 2px 4px rgb(171 169 169 / 90%);
+    margin-right: 400px
 }
 
 .container1{
@@ -358,4 +361,12 @@ button:hover{
 .btn:hover {
 
     text-decoration: none; /* Remove any underlines or default hover effects */
+}
+
+#toggleMasterPasswordVisibility{
+    float: right;
+    top:-27px;
+    margin-left: -15px;
+    right: 10px;
+    position:relative;
 }

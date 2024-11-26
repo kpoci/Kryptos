@@ -22,7 +22,8 @@ $(document).ready(function () {
 
         // Update the text indicator
         let strengthLevels = ["Very Weak", "Weak", "Fair", "Good", "Strong", "Very Strong"];
-        $('#master-pass-strength-text').text("Strength: " + strengthLevels[strength.score]);
+        let cappedScore = Math.min(strength.score, strengthLevels.length - 1); // Cap the score for levels
+        $('#master-pass-strength-text').text("Strength: " + strengthLevels[cappedScore]);
     });
 
     function getPasswordStrength(password) {
@@ -39,6 +40,8 @@ $(document).ready(function () {
     function updateMeter(score) {
         const colors = ['red', 'orange', 'yellow', 'green', 'darkgreen'];
         const widths = ['20%', '40%', '60%', '80%', '100%'];
+
+        score = Math.min(score, colors.length - 1);
 
         $('#master-pass-strength-meter').css({
             'background-color': colors[score],
