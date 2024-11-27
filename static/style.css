@@ -210,10 +210,6 @@ button:hover{
 }
 
 /* CSS to change navbar brand color */
-.navbar-brand {
-    color: #0f4b0f !important; /* Ensure color change takes priority */ /* Optional: Make it bold for emphasis */
-}
-
 .navbar-brand:hover {
     color: #0a3b0a; /* Slightly darker shade on hover */
     transition: color 0.3s ease; /* Smooth transition */
@@ -390,4 +386,35 @@ button:hover{
     margin-left: -15px;
     right: 10px;
     position:relative;
+}
+
+#toggleConfirmPasswordVisibility{
+    float: right;
+    top:11px;
+    margin-left: -15px;
+    right: 15px;
+    position:relative;
+}
+#toggleNewPasswordVisibility{
+    float: right;
+    top:11px;
+    margin-left: -15px;
+    right: 15px;
+    position:relative;
+}
+#toggleCurrentPasswordVisibility{
+    float: right;
+    top:11px;
+    margin-left: -15px;
+    right: 15px;
+    position:relative;
+}
+#currentMasterPassword  {
+    border-radius:7px;
+}
+#confirmMasterPassword  {
+    border-radius:7px;
+}
+#newMasterPassword  {
+    border-radius:7px;
 }
