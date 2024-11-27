@@ -11,8 +11,8 @@
         {% endif %}
     {% endwith %}
     <form method="post">
-        <div class="input-group mb-3">
-            <label for="security_answer"><strong>{{ security_question }}</strong></label>
+        <div class="mb-3">
+            <label for="security_answer" class="form-label"><strong>{{ security_question }}</strong></label>
             <input type="text" class="form-control" name="security_answer" id="security_answer" placeholder="Your Answer" required>
         </div>
         <input type="submit" class="btn btn-primary" value="Submit Answer">

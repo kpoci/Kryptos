@@ -16,7 +16,7 @@ body{
     height: 500px;
     margin-top: 100px;
     box-shadow: 0 2px 4px rgb(171 169 169 / 90%);
-    margin-right: 400px
+
 }
 
 .container1{
@@ -256,7 +256,7 @@ button:hover{
 }
 .site-column {
     align-content: center;
-    width: 412.17px;
+    width: 320.17px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
     white-space: nowrap;         /* Prevent text wrapping */
@@ -264,7 +264,16 @@ button:hover{
 }
 .login-column {
     align-content: center;
-    width: 250.17px;
+    width: 300.17px;
+    height: 40.09px;
+    overflow: hidden;            /* Hide overflow content */
+    white-space: nowrap;         /* Prevent text wrapping */
+    text-overflow: ellipsis;     /* Add ellipsis for overflowing text */
+}
+.show-column {
+    align-content: center;
+    padding-right: 20px;
+    width: 50px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
     white-space: nowrap;         /* Prevent text wrapping */
@@ -272,7 +281,7 @@ button:hover{
 }
 .password-column {
     align-content: center;
-    width: 474.88px;
+    width: 230.88px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
     white-space: nowrap;         /* Prevent text wrapping */
@@ -288,7 +297,7 @@ button:hover{
 }
 .title-column {
     align-content: center;
-    width: 170.02px;
+    width: 270.02px;
     height: 40.09px;
     overflow: hidden;            /* Hide overflow content */
     white-space: nowrap;         /* Prevent text wrapping */
@@ -347,19 +356,31 @@ button:hover{
     bottom: 20px;
     right: 20px;
     z-index: 1000;
+    width: 45px;       /* Increase the width */
+    height: 45px; 
+    padding-top: 8px;
+    opacity: 50%;
 }
 
 .fixed-button-top {
-    bottom: 70px; /* Adjust position above the existing button */
+    bottom: 100px; /* Adjust position above the existing button */
     right: 20px;
+    
+    
+}
+.btn-primary {
+    background-color: #2d53da;
+    text-decoration: none; /* Remove any underlines or default hover effects */
 }
 .btn-primary:hover {
     background-color: rgb(6, 77, 52);
     text-decoration: none; /* Remove any underlines or default hover effects */
+    
 }
 
 .btn:hover {
-
+    transition: opacity 0.7s ease;
+    opacity:100%;
     text-decoration: none; /* Remove any underlines or default hover effects */
 }
 

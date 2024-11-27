@@ -86,6 +86,19 @@ class OTPVerificationForm(FlaskForm):
 class ResendOTPForm(FlaskForm):
     submit = SubmitField('Resend OTP')
 
+#for verify_reset_otp
+class OTPVerificationForm(FlaskForm):
+    otp = StringField('OTP', validators=[
+        DataRequired(message="Please enter the OTP."),
+        Length(min=6, max=6, message='OTP must be exactly 6 digits.'),
+        Regexp('^\d{6}$', message='OTP must contain only numbers.')
+    ])
+    verify_submit = SubmitField('Verify')
+
+class ResendOTPForm(FlaskForm):
+    resend_submit = SubmitField('Resend OTP')
+
+
 # Home Route
 @app.route('/home')
 def home():
@@ -253,40 +266,147 @@ def recover_password():
 @app.route('/verify_reset_otp', methods=['GET', 'POST'])
 def verify_reset_otp():
     if 'reset_email' not in session:
-        flash("Session expired. Please start the password recovery process again.", "error")
+        flash("Session expired. Please start the password recovery process again.", "danger")
         return redirect(url_for('recover_password'))
 
+    form = OTPVerificationForm()
+    resend_otp_form = ResendOTPForm()
+    email = session['reset_email']
+
     if request.method == 'POST':
-        otp_input = request.form['otp']
-        email = session['reset_email']
+        if form.verify_submit.data and form.validate_on_submit():
+            otp_input = form.otp.data
 
+            try:
+                with mysql.connection.cursor(DictCursor) as cur:
+                    cur.execute("SELECT reset_otp, reset_otp_expiry FROM accounts WHERE email = %s", (email,))
+                    user = cur.fetchone()
+
+                    if not user:
+                        flash("User not found.", "danger")
+                        return redirect(url_for('recover_password'))
+
+                    reset_otp = user.get('reset_otp')
+                    reset_otp_expiry = user.get('reset_otp_expiry')
+
+                    if not reset_otp or not reset_otp_expiry:
+                        flash("OTP not found. Please request a new one.", "danger")
+                        return redirect(url_for('resend_reset_otp'))
+
+                    if datetime.now() > reset_otp_expiry:
+                        flash("OTP has expired. Please request a new one.", "danger")
+                        return redirect(url_for('resend_reset_otp'))
+
+                    if otp_input == str(reset_otp):
+                        session['otp_verified'] = True
+                        flash("OTP verified successfully!", "success")
+                        return redirect(url_for('security_question'))
+                    else:
+                        flash("Invalid OTP. Please try again.", "danger")
+                        return redirect(url_for('verify_reset_otp'))
+            except Exception as e:
+                print(f"Error during OTP verification: {e}")
+                flash("An error occurred during OTP verification. Please try again.", "danger")
+                return redirect(url_for('verify_reset_otp'))
+
+        elif 'resend_submit' in request.form and resend_otp_form.validate_on_submit():
+            # Resend OTP logic
+            try:
+                with mysql.connection.cursor(DictCursor) as cur:
+                    # Fetch user info
+                    cur.execute("SELECT username FROM accounts WHERE email = %s", (email,))
+                    user = cur.fetchone()
+
+                    if not user:
+                        flash("User not found.", "danger")
+                        return redirect(url_for('recover_password'))
+
+                    # Generate a new OTP
+                    otp = random.randint(100000, 999999)
+                    otp_expiry = datetime.now() + timedelta(minutes=5)
+
+                    # Update OTP and expiry in the accounts table
+                    cur.execute("UPDATE accounts SET reset_otp = %s, reset_otp_expiry = %s WHERE email = %s",
+                                (otp, otp_expiry, email))
+                    mysql.connection.commit()
+
+                    # Send OTP email
+                    subject = "Your OTP for Password Reset (Resent)"
+                    message = f"""
+                    <p>Dear {user['username']},</p>
+                    <p>Your new OTP for password reset is: <strong>{otp}</strong></p>
+                    <p>This OTP is valid for the next 5 minutes.</p>
+                    <p>Please do not reply to this email. If you did not request this OTP, please contact our support team at djl0466@dlsud.edu.ph</p>
+                    <p>Best regards,<br>Kryptos***</p>
+                    """
+                    send_email(email, subject, message)
+
+                    flash("A new OTP has been sent to your email.", "success")
+            except Exception as e:
+                mysql.connection.rollback()
+                print(f"Error during OTP resend: {e}")
+                flash("Failed to resend OTP. Please try again.", "danger")
+                return redirect(url_for('verify_reset_otp'))
+    else:
+        # Fetch user's email to display
         try:
-            # Fetch the OTP and expiry from the database
-            cur = mysql.connection.cursor(DictCursor)
-            cur.execute("SELECT reset_otp, reset_otp_expiry FROM accounts WHERE email = %s", (email,))
-            user = cur.fetchone()
-            cur.close()
-
-            if user:
-                reset_otp = user['reset_otp']
-                reset_otp_expiry = user['reset_otp_expiry']
-
-                # Check if OTP is valid and not expired
-                if reset_otp == otp_input and datetime.now() < reset_otp_expiry:
-                    session['otp_verified'] = True
-                    return redirect(url_for('security_question'))
-                else:
-                    flash("Invalid or expired OTP. Please try again.", "error")
-                    return redirect(url_for('verify_reset_otp'))
-            else:
-                flash("User not found.", "error")
-                return redirect(url_for('recover_password'))
+            with mysql.connection.cursor(DictCursor) as cur:
+                cur.execute("SELECT email FROM accounts WHERE email = %s", (email,))
+                user = cur.fetchone()
+                email = user.get('email') if user else 'your email'
         except Exception as e:
-            print(f"Error during OTP verification: {e}")
-            flash("An error occurred. Please try again.", "error")
-            return redirect(url_for('verify_reset_otp'))
+            print(f"Error fetching email: {e}")
+            email = 'your email'
 
-    return render_template('verify_reset_otp.html')
+    return render_template('verify_reset_otp.html', email=email, form=form, resend_otp_form=resend_otp_form)
+
+#resend for reset recovery password
+@app.route('/resend_reset_otp', methods=['POST'])
+def resend_reset_otp():
+    if 'reset_email' not in session:
+        flash("Session expired. Please start the password recovery process again.", "danger")
+        return redirect(url_for('recover_password'))
+
+    email = session['reset_email']
+    try:
+        cur = mysql.connection.cursor(DictCursor)
+        # Fetch user info
+        cur.execute("SELECT username FROM accounts WHERE email = %s", (email,))
+        user = cur.fetchone()
+
+        if not user:
+            flash("User not found.", "danger")
+            return redirect(url_for('recover_password'))
+
+        # Generate a new OTP
+        otp = random.randint(100000, 999999)
+        otp_expiry = datetime.now() + timedelta(minutes=5)
+
+        # Update OTP and expiry in the accounts table
+        cur.execute("UPDATE accounts SET reset_otp = %s, reset_otp_expiry = %s WHERE email = %s",
+                    (otp, otp_expiry, email))
+        mysql.connection.commit()
+
+        # Send OTP email
+        subject = "Your OTP for Password Reset (Resent)"
+        message = f"""
+        <p>Dear {user['username']},</p>
+        <p>Your new OTP for password reset is: <strong>{otp}</strong></p>
+        <p>This OTP is valid for the next 5 minutes.</p>
+        <p>Please do not reply to this email. If you did not request this OTP, please contact our support team at djl0466@dlsud.edu.ph</p>
+        <p>Best regards,<br>Kryptos***</p>
+        """
+        send_email(email, subject, message)
+
+        flash("A new OTP has been sent to your email.", "success")
+    except Exception as e:
+        mysql.connection.rollback()
+        print(f"Error during OTP resend: {e}")
+        flash("Failed to resend OTP. Please try again.", "danger")
+    finally:
+        cur.close()
+
+    return redirect(url_for('verify_reset_otp'))
 
 #security question
 @app.route('/security_question', methods=['GET', 'POST'])
@@ -368,6 +488,15 @@ def reset_password():
             flash("Passwords do not match. Please try again.", "error")
             return redirect(url_for('reset_password'))
 
+        # Password Requirements Validation
+        if len(new_password) < 8 \
+           or not re.search(r'[A-Z]', new_password) \
+           or not re.search(r'[a-z]', new_password) \
+           or not re.search(r'\d', new_password) \
+           or not re.search(r'[!@#$%^&*]', new_password):
+            flash("Password does not meet the required strength criteria.", "error")
+            return redirect(url_for('reset_password'))
+
         try:
             # Hash the new password
             hashed_password = ph.hash(new_password)
@@ -390,7 +519,7 @@ def reset_password():
             flash("An error occurred. Please try again.", "error")
             return redirect(url_for('reset_password'))
 
-    return render_template('reset_password.html')
+    return render_template('reset_password.html') 
 
 #settings
 @app.route('/settings')

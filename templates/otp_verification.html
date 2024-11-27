@@ -119,7 +119,7 @@
         </form>
         <div class="resend-link">
             <form id="resend-otp-form" action="{{ url_for('resend_otp') }}" method="POST" style="display: inline;">
-                {{ resend_form.csrf_token }}
+               
                 <button type="submit" class="btn btn-outline-secondary align-baseline" id="resend-otp-btn">RESEND</button>
             </form>
             <p id="countdown" style="display: none;">Please wait <span id="timer">60</span> seconds before resending.</p>

@@ -109,9 +109,9 @@
 
 #master-pass-strength-meter {
     width: 100%;
-    height: 5px; /* Made the bar thinner */
+    height: 3px; /* Made the bar thinner */
     background-color: #eee; /* Default unfilled color */
-    border-radius: 5px;
+    border-radius: 3px;
     overflow: hidden;
 }
 
