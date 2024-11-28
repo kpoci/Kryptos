@@ -838,10 +838,10 @@ def passwordvault():
         return redirect(url_for('login'))
 
     user_id = session['user_id']
-    cur = mysql.connection.cursor(DictCursor)  # Use DictCursor to fetch results as dictionaries
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # Fetch categories (keys with their associated encryption keys)
-    cur.execute("SELECT key_id, key_name, `key` FROM `keys`")
+    # Fetch keys belonging to the authenticated user
+    cur.execute("SELECT key_id, key_name, `key` FROM `keys` WHERE Id = %s", (user_id,))
     categories = cur.fetchall()
 
     passwords_by_category = {}
@@ -850,40 +850,30 @@ def passwordvault():
         key_name = category['key_name']
         encryption_key = category['key']
 
-        # Print the encryption key being used for this category
-        print(f"Using encryption key for key_id {key_id}, key_name {key_name}: {encryption_key}")
-
-        fernet = Fernet(encryption_key)  # Initialize Fernet with the encryption key
+        fernet = Fernet(encryption_key.encode())  # Ensure the key is in bytes
 
         # Fetch passwords associated with this key_id
         cur.execute("SELECT password_id, site, login_name, passwords, title FROM passwords WHERE key_id = %s", (key_id,))
         encrypted_passwords = cur.fetchall()
 
-        # Decrypt passwords for this category
         decrypted_passwords = []
         for password in encrypted_passwords:
-            # Print the encrypted password before decryption
-            print(f"Encrypted password for password_id {password['password_id']}: {password['passwords']}")
-            
             try:
-                # Attempt decryption
                 decrypted_password = fernet.decrypt(password['passwords'].encode()).decode()
                 decrypted_passwords.append({
                     'id': password['password_id'],
                     'site': password['site'],
                     'title': password['title'],
                     'login_name': password['login_name'],
-                    'passwords': decrypted_password  # Add decrypted password
+                    'passwords': decrypted_password  # Decrypted password
                 })
             except InvalidToken:
-                # Log error if decryption fails
-                print(f"Decryption failed for password_id {password['password_id']} with key_id {key_id}")
                 decrypted_passwords.append({
                     'id': password['password_id'],
                     'site': password['site'],
                     'title': password['title'],
                     'login_name': password['login_name'],
-                    'passwords': "[Decryption Failed]"  # Placeholder if decryption fails
+                    'passwords': "[Decryption Failed]"
                 })
 
         passwords_by_category[key_id] = decrypted_passwords
@@ -891,6 +881,8 @@ def passwordvault():
     cur.close()
 
     return render_template('passwordvault.html', categories=categories, passwords_by_category=passwords_by_category)
+
+
 
 
 @app.route('/fetch_keys', methods=['GET'])
@@ -992,19 +984,31 @@ def fetch_containers():
         return jsonify({'message': 'User not logged in'}), 401
 
     user_id = session['user_id']
+    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    cur = mysql.connection.cursor()
     try:
-        # Fetch records from the passwords table for the logged-in user
-        cur.execute("SELECT site, login_name , title FROM `passwords` WHERE key_id = %s", (user_id,))
+        # Fetch keys belonging to the user
+        cur.execute("SELECT key_id FROM `keys` WHERE Id = %s", (user_id,))
+        keys = cur.fetchall()
+
+        if not keys:
+            return jsonify({'message': 'No containers found'}), 404
+
+        # Extract key_ids
+        key_ids = [key['key_id'] for key in keys]
+
+        # Fetch passwords associated with these key_ids
+        format_strings = ','.join(['%s'] * len(key_ids))
+        query = f"SELECT site, login_name, title FROM `passwords` WHERE key_id IN ({format_strings})"
+        cur.execute(query, tuple(key_ids))
         records = cur.fetchall()
-        
+
         if not records:
             return jsonify({'message': 'No containers found'}), 404
 
         containers = []
         for record in records:
-            site, login_name, title = record
+            site, login_name, title = record['site'], record['login_name'], record['title']
             containers.append({
                 'site': site,
                 'login_name': login_name,
@@ -1017,6 +1021,7 @@ def fetch_containers():
         return jsonify({'message': 'Failed to fetch data: ' + str(e)}), 500
     finally:
         cur.close()
+
 
 
 @app.route('/add_container', methods=['POST'])
