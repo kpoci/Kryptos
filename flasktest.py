@@ -1531,12 +1531,6 @@ def change_master_password():
         if not account or not ph.verify(account['master_pass'], current_master_password):
             return jsonify({'message': 'Current master password is incorrect'}), 403
 
-        # Debug print: Current plaintext password (from user input)
-        print(f"Current master password (plaintext): {current_master_password}")
-
-        # Debug print: New plaintext password (from user input)
-        print(f"New master password (plaintext): {new_master_password}")
-
         # Hash the new master password
         hashed_new_master_pass = ph.hash(new_master_password)
 
@@ -1628,4 +1622,4 @@ def logout():
     return redirect(url_for('login'))  # Redirect to home page or login page
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
