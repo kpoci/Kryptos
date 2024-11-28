@@ -1,3 +1,4 @@
+
 import os
 import MySQLdb
 from MySQLdb.cursors import DictCursor
@@ -18,6 +19,13 @@ import logging
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, Length, Regexp
+
+logging.basicConfig(
+    filename='app.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s:%(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def is_password_strong(password):
     # At least 8 characters
@@ -840,7 +848,7 @@ def passwordvault():
     user_id = session['user_id']
     cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
-    # Fetch keys belonging to the authenticated user
+    # Fetch `keys` belonging to the authenticated user
     cur.execute("SELECT key_id, key_name, `key` FROM `keys` WHERE Id = %s", (user_id,))
     categories = cur.fetchall()
 
@@ -1026,356 +1034,333 @@ def fetch_containers():
 
 @app.route('/add_container', methods=['POST'])
 def add_container():
-    # Step 1: Check if user is logged in
     if 'user_id' not in session:
-        return jsonify({'message': 'User not logged in'}), 401
+        return jsonify({'success': False, 'message': 'User not logged in'}), 401
 
     user_id = session['user_id']
-    site = request.form.get('url')
-    login_name = request.form.get('email')
-    password = request.form.get('password')
-    key_name = request.form.get('key_name')
-    title = request.form.get('title')
 
-    # Step 2: Validate required fields
-    if not site or not login_name or not password or not key_name or not title:
-        return jsonify({'message': 'Required fields are missing'}), 400
-
-    print(f"Received data: site={site}, login_name={login_name}, password={password}, key_name={key_name}, title={title}")
-
-    cur = mysql.connection.cursor()
+    # Parse JSON data
     try:
-        # Step 3: Fetch key_id and encryption key using only key_name
-        cur.execute("SELECT key_id, `key` FROM `keys` WHERE key_name = %s", (key_name,))
-        key_record = cur.fetchone()
+        data = request.get_json()
+        title = data.get('title')
+        login_name = data.get('login_name')
+        password = data.get('password')
+        site = data.get('site')
+        key_name = data.get('key_name')
+    except Exception as e:
+        logging.error(f"Error parsing request data: {e}")
+        return jsonify({'success': False, 'message': 'Invalid request format'}), 400
 
-        if not key_record:
-            print("Key not found")
-            return jsonify({'message': 'Key not found'}), 404
+    # Validate required fields
+    if not all([title, login_name, password, site, key_name]):
+        return jsonify({'success': False, 'message': 'All fields are required.'}), 400
 
-        key_id, encryption_key = key_record
-        print(f"Fetched key_id: {key_id} and encryption key for key_name: {key_name}")
+    if not site.startswith(('http://', 'https://')):
+        return jsonify({'success': False, 'message': 'Invalid site URL format.'}), 400
 
-        # Step 4: Encrypt the password
-        fernet = Fernet(encryption_key)
-        encrypted_password = fernet.encrypt(password.encode()).decode()
-        print(f"Encrypted password: {encrypted_password}")
+    try:
+        with mysql.connection.cursor(DictCursor) as cur:
+            # Fetch key_id and encryption key
+            cur.execute("SELECT key_id, `key` FROM `keys` WHERE key_name = %s AND Id = %s", (key_name, user_id))
+            key_record = cur.fetchone()
 
-        # Step 5: Insert into the passwords table with the correct key_id
-        cur.execute("INSERT INTO `passwords` (key_id, site, login_name, passwords, title) VALUES (%s, %s, %s, %s, %s)", 
-                    (key_id, site, login_name, encrypted_password, title))
-        mysql.connection.commit()
-        print("Data inserted successfully")
-        
-        return jsonify({'message': 'Container added successfully'}), 200
+            if not key_record:
+                logging.warning(f"Key '{key_name}' not found for user {user_id}")
+                return jsonify({'success': False, 'message': 'Key not found or unauthorized access'}), 404
+
+            key_id = key_record['key_id']
+            encryption_key = key_record['key']
+
+            # Encrypt the password
+            fernet = Fernet(encryption_key.encode())
+            encrypted_password = fernet.encrypt(password.encode()).decode()
+
+            # Insert the password
+            cur.execute("""
+                INSERT INTO passwords (user_id, key_id, site, login_name, passwords, title)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, key_id, site, login_name, encrypted_password, title))
+            mysql.connection.commit()
+
+            logging.info(f"Password added successfully by user {user_id}")
+            return jsonify({'success': True, 'message': 'Container added successfully'}), 200
+
     except Exception as e:
         mysql.connection.rollback()
-        print(f"Database insertion failed: {str(e)}")
-        return jsonify({'message': f'Database insertion failed: {str(e)}'}), 500
-    finally:
-        cur.close()
+        logging.error(f"Error inserting password for user {user_id}: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred while adding the container.'}), 500
 
 
-@app.route('/verify_key', methods=['POST'])
-def verify_key():
-    if 'user_id' not in session:
-        return jsonify({'message': 'User not logged in'}), 401
-
-    user_id = session['user_id']
-    key_name = request.form['key_name']
-
-    cur = mysql.connection.cursor()
-    try:
-        # Fetch the encryption key from the keys table using the provided key_name
-        cur.execute("SELECT `key` FROM `keys` WHERE Id = %s AND key_name = %s", (user_id, key_name))
-        key_record = cur.fetchone()
-
-        if not key_record:
-            return jsonify({'message': 'Key not found'}), 404
-
-        encryption_key = key_record[0]
-        return jsonify({'message': 'Key verified', 'encryption_key': encryption_key}), 200
-    except Exception as e:
-        print(f"General error: {str(e)}")
-        return jsonify({'message': 'Failed to verify key: ' + str(e)}), 500
-    finally:
-        cur.close()
 
 @app.route('/decrypt_password', methods=['POST'])
 def decrypt_password():
+    # Step 1: Check if user is logged in
     if 'user_id' not in session:
+        logger.warning("Unauthorized access attempt to /decrypt_password")
         return jsonify({'message': 'User not logged in'}), 401
 
     user_id = session['user_id']
+
+    # Step 2: Validate input fields
     site = request.form.get('site')
     login_name = request.form.get('login_name')
     key_name = request.form.get('key_name')
     title = request.form.get('title')
 
     if not all([site, login_name, key_name, title]):
+        logger.warning(f"Missing fields in request from user {user_id}: site={site}, login_name={login_name}, key_name={key_name}, title={title}")
         return jsonify({'message': 'Missing data in request'}), 400
 
-    cur = mysql.connection.cursor()
+    cur = mysql.connection.cursor(DictCursor)
     try:
-        # Fetch the encryption key from the keys table using the provided key_name
-        cur.execute("SELECT `key` FROM `keys` WHERE Id = %s AND key_name = %s", (user_id, key_name))
+        # Step 3: Fetch the encryption key and ensure ownership
+        cur.execute("SELECT key_id, `key` FROM `keys` WHERE Id = %s AND key_name = %s", (user_id, key_name))
         key_record = cur.fetchone()
 
         if not key_record:
+            logger.info(f"Key '{key_name}' not found for user {user_id}")
             return jsonify({'message': 'Key not found'}), 404
 
-        encryption_key = key_record[0]
+        key_id = key_record['key_id']
+        encryption_key = key_record['key']
 
-        # Fetch the encrypted password from the passwords table
-        cur.execute("SELECT `passwords` FROM `passwords` WHERE key_id = %s AND site = %s AND login_name = %s AND title = %s", (user_id, site, login_name, title))
+        # Step 4: Fetch the encrypted password
+        cur.execute("""
+            SELECT `passwords` FROM `passwords` 
+            WHERE key_id = %s AND site = %s AND login_name = %s AND title = %s
+        """, (key_id, site, login_name, title))
         password_record = cur.fetchone()
 
         if not password_record:
+            logger.info(f"Password not found for user {user_id}: site={site}, login_name={login_name}, title={title}")
             return jsonify({'message': 'Password not found'}), 404
 
-        encrypted_password = password_record[0]
-        fernet = Fernet(encryption_key)
-        decrypted_password = fernet.decrypt(encrypted_password.encode()).decode()
+        encrypted_password = password_record['passwords']
 
-        return jsonify({'message': 'Password decrypted', 'password': decrypted_password}), 200
+        # Step 5: Decrypt the password
+        try:
+            fernet = Fernet(encryption_key.encode())
+            decrypted_password = fernet.decrypt(encrypted_password.encode()).decode()
+            logger.info(f"Password successfully decrypted for user {user_id}")
+            return jsonify({'message': 'Password decrypted successfully', 'password': decrypted_password}), 200
+        except InvalidToken:
+            logger.error(f"Decryption failed for user {user_id} due to invalid token")
+            return jsonify({'message': 'Failed to decrypt the password. Invalid encryption key.'}), 500
+
     except Exception as e:
-        print(f"General error: {str(e)}")
-        return jsonify({'message': 'Failed to decrypt password: ' + str(e)}), 500
+        logger.error(f"General error for user {user_id} in /decrypt_password: {e}")
+        return jsonify({'message': 'An error occurred while decrypting the password.'}), 500
     finally:
         cur.close()
 
 #UPDATED - TO BE DELETED, GOAL IS TO CONNECT THE FIXED BUTTON TO THE ADD CONTAINER TO BE EFFICIENT    
-@app.route('/add_password', methods=['POST'])
-def add_password():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    user_id = session['user_id']
-    key_id = request.form.get('key_id')
-    site = request.form.get('site')
-    login_name = request.form.get('login_name')
-    password = request.form.get('passwords')
-    new_key_name = request.form.get('new_key_name')
-
-    # Check for required fields
-    if not site or not login_name or not password:
-        return "Required fields are missing", 400
-
-    cur = mysql.connection.cursor()
-
-    # Check if a new key is to be created
-    if key_id == 'new' and new_key_name:
-        # Insert new key and retrieve the generated Key_id
-        cur.execute("INSERT INTO keys (id, key_name, key) VALUES (%s, %s, %s)", 
-                    (user_id, new_key_name, ''))  # Assuming 'key' field can be left empty
-        mysql.connection.commit()
-        key_id = cur.lastrowid  # Get the last inserted Key_id
-
-    # Insert the new password entry
-    cur.execute("INSERT INTO passwords (key_id, site, login_name, passwords, title) VALUES (%s, %s, %s, %s, %s)", 
-                (key_id, site, login_name, password, site))
-    mysql.connection.commit()
-    cur.close()
-
-    return redirect(url_for('passwordvault'))
-
 
 @app.route('/get_key_id', methods=['POST'])
 def get_key_id():
+    """
+    Retrieve the key_id for a given key_name associated with the logged-in user.
+    """
+    # Step 1: Ensure the user is logged in
+    if 'user_id' not in session:
+        logger.warning("Unauthorized access attempt to /get_key_id.")
+        return jsonify({'success': False, 'error': 'Unauthorized access. Please log in.'}), 401
+
+    user_id = session['user_id']
+
+    # Step 2: Validate the input
     key_name = request.form.get('key_name')
-    # Assume you have a function or query to get the key_id based on key_name
-    key = Key.query.filter_by(name=key_name).first()
-    if key:
-        return jsonify({'key_id': key.id})
-    else:
-        return jsonify({'error': 'Key not found'}), 404
+    if not key_name:
+        logger.warning(f"User {user_id} submitted request without 'key_name'.")
+        return jsonify({'success': False, 'error': 'Key name is required.'}), 400
+
+    try:
+        # Step 3: Retrieve key_id from the database
+        with mysql.connection.cursor(DictCursor) as cur:
+            query = """
+                SELECT key_id 
+                FROM keys 
+                WHERE key_name = %s AND Id = %s
+                LIMIT 1
+            """
+            cur.execute(query, (key_name, user_id))
+            key = cur.fetchone()
+
+            if key:
+                logger.info(f"Key ID {key['key_id']} retrieved for user {user_id} and key_name '{key_name}'.")
+                return jsonify({'success': True, 'key_id': key['key_id']}), 200
+            else:
+                logger.info(f"No key found for user {user_id} and key_name '{key_name}'.")
+                return jsonify({'success': False, 'error': 'Key not found.'}), 404
+    except Exception as e:
+        logger.error(f"Error retrieving key ID for user {user_id} with key_name '{key_name}': {e}")
+        return jsonify({'success': False, 'error': 'An error occurred while retrieving the key ID.'}), 500
 
 @app.route('/delete_password/<int:password_id>', methods=['DELETE'])
 def delete_password(password_id):
-    cur = mysql.connection.cursor()
+    # Step 1: Check if user is logged in
+    if 'user_id' not in session:
+        logger.warning("Unauthorized access attempt to /delete_password")
+        return jsonify({'success': False, 'message': 'Unauthorized access'}), 401
+
+    user_id = session['user_id']
 
     try:
-        # Attempt to delete the password entry by password_id
-        cur.execute("DELETE FROM passwords WHERE password_id = %s", (password_id,))
-        mysql.connection.commit()
+        with mysql.connection.cursor(DictCursor) as cur:
+            # Step 2: Verify ownership of the password
+            cur.execute("""
+                SELECT passwords.password_id FROM passwords
+                JOIN `keys` ON passwords.key_id = keys.key_id
+                WHERE passwords.password_id = %s AND keys.Id = %s
+                LIMIT 1
+            """, (password_id, user_id))
+            password = cur.fetchone()
 
-        if cur.rowcount == 0:
-            print(f"No password found with id {password_id}")
-            return jsonify({'success': False, 'message': 'Password not found'}), 404
+            if not password:
+                logger.warning(f"User {user_id} attempted to delete unauthorized or non-existent password_id {password_id}")
+                return jsonify({'success': False, 'message': 'Password not found or unauthorized'}), 404
 
-        print(f"Password with id {password_id} deleted successfully")
-        return jsonify({'success': True, 'message': 'Password deleted successfully'}), 200
+            # Step 3: Delete the password
+            cur.execute("DELETE FROM passwords WHERE password_id = %s", (password_id,))
+            mysql.connection.commit()
+
+            logger.info(f"User {user_id} successfully deleted password_id {password_id}")
+            return jsonify({'success': True, 'message': 'Password deleted successfully'}), 200
 
     except Exception as e:
         mysql.connection.rollback()
-        print(f"Error deleting password: {e}")
-        return jsonify({'success': False, 'message': f'Failed to delete password: {str(e)}'}), 500
-    finally:
-        cur.close()
+        logger.error(f"Error deleting password_id {password_id} for user_id {user_id}: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred while deleting the password. Please try again.'}), 500
 
-#NEW UPDATE - UPDATE FUNCTION
 @app.route('/get_password/<int:password_id>', methods=['GET'])
 def get_password(password_id):
-    # Step 1: Check if user is logged in
     if 'user_id' not in session:
+        logging.warning("Unauthorized access attempt to retrieve password.")
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
     user_id = session['user_id']
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-
     try:
-        # Step 2: Fetch the encrypted password and associated key from the database
-        query = """
-            SELECT passwords.password_id, passwords.key_id, passwords.passwords, passwords.site, passwords.login_name,
-                   passwords.title, `keys`.key_name, `keys`.`key`
-            FROM passwords
-            JOIN `keys` ON passwords.key_id = `keys`.key_id
-            JOIN accounts ON `keys`.id = accounts.Id
-            WHERE passwords.password_id = %s AND accounts.Id = %s
-        """
-        cur.execute(query, (password_id, user_id))
-        result = cur.fetchone()
+        with mysql.connection.cursor(DictCursor) as cur:
+            logging.debug(f"Fetching password for password_id={password_id}, user_id={user_id}")
 
-        if not result:
-            print("Password not found or unauthorized access")
-            return jsonify({'success': False, 'message': 'Password not found or unauthorized access'}), 404
+            query = """
+                SELECT p.password_id, p.key_id, p.passwords, p.site, p.login_name,
+                       p.title, k.key_name, k.`key`
+                FROM passwords p
+                JOIN `keys` k ON p.key_id = k.key_id
+                WHERE p.password_id = %s AND k.Id = %s
+                LIMIT 1
+            """
+            cur.execute(query, (password_id, user_id))
+            result = cur.fetchone()
 
-        # Step 3: Get the encrypted password and encryption key
-        encrypted_password = result['passwords']
-        key_id = result['key_id']
-        key_name = result['key_name']
-        encryption_key = result['key']
+            if not result:
+                logging.warning(f"No matching record for password_id={password_id}, user_id={user_id}")
+                return jsonify({'success': False, 'message': 'Password not found or unauthorized access.'}), 404
 
-        print(f"Fetched encrypted password for password_id {password_id} with key_id {key_id} and key_name '{key_name}'")
+            logging.debug(f"Query result: {result}")
 
-        # Step 4: Attempt to decrypt with the key associated with the key_name
-        decryption_success = False
-        try:
-            fernet = Fernet(encryption_key.encode())
-            decrypted_password = fernet.decrypt(encrypted_password.encode()).decode()
-            decryption_success = True
-            print(f"Successfully decrypted password_id {password_id} with key_name '{key_name}'")
-        except InvalidToken:
-            print(f"Decryption failed with key_name '{key_name}' for password_id {password_id}")
-            decryption_success = False
+            encrypted_password = result['passwords']
+            encryption_key = result['key']
 
-        # Step 5: If decryption failed, attempt with other keys from the database
-        if not decryption_success:
-            # Fetch all keys except the one already tried
-            cur.execute("SELECT key_id, key_name, `key` FROM `keys` WHERE key_id != %s", (key_id,))
-            all_keys = cur.fetchall()
-            for key_record in all_keys:
-                alternative_key_name = key_record['key_name']
-                alternative_encryption_key = key_record['key']
-                try:
-                    fernet = Fernet(alternative_encryption_key.encode())
-                    decrypted_password = fernet.decrypt(encrypted_password.encode()).decode()
-                    decryption_success = True
-                    print(f"Successfully decrypted password_id {password_id} with alternative key_name '{alternative_key_name}'")
+            if not encryption_key:
+                logging.error(f"Encryption key is null for key_id={result['key_id']}, password_id={password_id}")
+                return jsonify({'success': False, 'message': 'Encryption key not found.'}), 500
 
-                    # Re-encrypt with the correct key (original key associated with password)
-                    correct_fernet = Fernet(encryption_key.encode())
-                    new_encrypted_password = correct_fernet.encrypt(decrypted_password.encode()).decode()
+            try:
+                fernet = Fernet(encryption_key.encode())
+                decrypted_password = fernet.decrypt(encrypted_password.encode()).decode()
+                logging.info(f"Decrypted password successfully for password_id={password_id}")
+            except InvalidToken as e:
+                logging.error(f"Invalid decryption token for password_id={password_id}: {e}")
+                return jsonify({'success': False, 'message': 'Failed to decrypt the password.'}), 500
 
-                    # Update the password in the database with new encrypted password
-                    update_query = """
-                        UPDATE passwords
-                        SET passwords = %s
-                        WHERE password_id = %s
-                    """
-                    cur.execute(update_query, (new_encrypted_password, password_id))
-                    mysql.connection.commit()
-                    print(f"Re-encrypted and updated password_id {password_id} with key_name '{key_name}'")
-                    break
-                except InvalidToken:
-                    print(f"Decryption failed with alternative key_name '{alternative_key_name}' for password_id {password_id}")
-                    continue  # Try next key
-            else:
-                # If all keys fail
-                print(f"Decryption failed for password_id {password_id} with all known keys")
-                return jsonify({'success': False, 'message': 'Failed to decrypt the password'}), 500
-
-        # Step 6: Prepare the response data
-        response_data = {
-            'password_id': password_id,
-            'title': result['title'],
-            'login_name': result['login_name'],
-            'password': decrypted_password,  # Decrypted password
-            'site': result['site'],
-            'keys_name': key_name,
-            'key_id': key_id,
-            'url': result.get('url', '')
-        }
-
-        return jsonify(response_data), 200
+            response_data = {
+                'password_id': password_id,
+                'title': result['title'],
+                'login_name': result['login_name'],
+                'password': decrypted_password,
+                'site': result['site'],
+                'key_name': result['key_name'],
+                'key_id': result['key_id'],
+            }
+            logging.debug(f"Response data: {response_data}")
+            return jsonify({'success': True, 'data': response_data}), 200
 
     except Exception as e:
-        print(f"Error retrieving password: {str(e)}")
-        return jsonify({'success': False, 'message': 'An error occurred while retrieving the password'}), 500
-    finally:
-        cur.close()
+        logging.error(f"Unexpected error retrieving password_id={password_id} for user_id={user_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': 'An error occurred while retrieving the password.'}), 500
+
+
 
 #NEW UPDATE - UPDATE PASSWORD 2
 
 @app.route('/update_password/<int:password_id>', methods=['POST'])
 def update_password(password_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        logging.warning("Unauthorized attempt to update password.")
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
     user_id = session['user_id']
-    key_id = request.form.get('key_id')
-    site = request.form.get('site')
-    login_name = request.form.get('login_name')
-    password = request.form.get('passwords')
-    title = request.form.get('title')
-
-    # Check for required fields
-    if not site or not login_name or not password:
-        return "Required fields are missing", 400
-
-    cur = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
 
     try:
-        # Fetch the encryption key based on key_id
-        cur.execute("SELECT `key`, key_name FROM `keys` WHERE key_id = %s", (key_id,))
-        key_record = cur.fetchone()
+        # Parse JSON data
+        data = request.get_json()
+        logging.debug(f"Received data for password update: {data}")
 
-        if not key_record:
-            print(f"Encryption key not found for key_id {key_id}")
-            return jsonify({'message': 'Encryption key not found'}), 404
+        key_id = data.get('key_id')
+        site = data.get('site')
+        login_name = data.get('login_name')
+        password = data.get('passwords')  # Ensure field names match frontend
+        title = data.get('title')
 
-        encryption_key = key_record['key']
-        key_name = key_record['key_name']
-        print(f"Using encryption key for key_id {key_id}, key_name {key_name}: {encryption_key}")
+        # Check for required fields
+        if not all([key_id, site, login_name, password, title]):
+            logging.warning(f"Missing fields in update password request by user {user_id}.")
+            return jsonify({'success': False, 'message': 'All fields are required.'}), 400
 
-        # Encrypt the password
-        fernet = Fernet(encryption_key.encode())
-        encrypted_password = fernet.encrypt(password.encode()).decode()
-        print(f"Encrypted password for password_id {password_id}: {encrypted_password}")
+        with mysql.connection.cursor(DictCursor) as cur:
+            # Verify that the new key_id belongs to the user
+            cur.execute("""
+                SELECT `key` FROM `keys` 
+                WHERE key_id = %s AND Id = %s
+            """, (key_id, user_id))
+            key_record = cur.fetchone()
 
-        # Update only if the password belongs to the logged-in user
-        query = """
-            UPDATE passwords
-            JOIN `keys` ON passwords.key_id = `keys`.key_id
-            JOIN accounts ON `keys`.id = accounts.Id
-            SET passwords.key_id = %s,
-                passwords.site = %s,
-                passwords.login_name = %s,
-                passwords.passwords = %s,
-                passwords.title = %s
-            WHERE passwords.password_id = %s AND accounts.Id = %s
-        """
-        cur.execute(query, (key_id, site, login_name, encrypted_password, title, password_id, user_id))
-        mysql.connection.commit()
-        print(f"Password updated successfully for password_id {password_id}")
+            if not key_record:
+                logging.warning(f"User {user_id} attempted to use invalid key_id {key_id} for password_id {password_id}.")
+                return jsonify({'success': False, 'message': 'Encryption key not found or unauthorized.'}), 404
+
+            encryption_key = key_record['key']
+            fernet = Fernet(encryption_key.encode())
+            encrypted_password = fernet.encrypt(password.encode()).decode()
+
+            # Update the password in the database
+            update_query = """
+                UPDATE passwords
+                SET key_id = %s,
+                    site = %s,
+                    login_name = %s,
+                    passwords = %s,
+                    title = %s
+                WHERE password_id = %s AND key_id IN (
+                    SELECT key_id FROM `keys` WHERE Id = %s
+                )
+            """
+            cur.execute(update_query, (key_id, site, login_name, encrypted_password, title, password_id, user_id))
+            mysql.connection.commit()
+
+            if cur.rowcount == 0:
+                logging.warning(f"User {user_id} attempted to update non-existent or unauthorized password_id {password_id}.")
+                return jsonify({'success': False, 'message': 'Password not found or unauthorized.'}), 404
+
+            logging.info(f"Password_id {password_id} updated successfully by user {user_id}.")
+            return jsonify({'success': True, 'message': 'Password updated successfully.'}), 200
+
     except Exception as e:
         mysql.connection.rollback()
-        print(f"Error updating password: {str(e)}")
-        return jsonify({'message': f'Error updating password: {str(e)}'}), 500
-    finally:
-        cur.close()
+        logging.error(f"Error updating password_id {password_id} for user_id {user_id}: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred while updating the password.'}), 500
 
-    return redirect(url_for('passwordvault'))
 
 @app.route('/delete_key/<int:key_id>', methods=['DELETE'])
 def delete_key(key_id):
@@ -1628,8 +1613,8 @@ def delete_password(password_id):
     # Delete only if the password belongs to the logged-in user
     query = """
         DELETE passwords FROM passwords
-        JOIN keys ON passwords.key_id = keys.key_id
-        WHERE passwords.password_id = %s AND keys.id = %s
+        JOIN `keys` ON passwords.key_id = `keys`.key_id
+        WHERE passwords.password_id = %s AND `keys`.id = %s
     """
     cur.execute(query, (password_id, user_id))
     mysql.connection.commit()

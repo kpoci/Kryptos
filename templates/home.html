@@ -943,7 +943,7 @@
               
               <main class="" style="min-height: 100vh; background-color:rgb(248 249 250);">
               
-                <section class="py-3 text-center container-xxl" style="background-color: rgb(8, 109, 73); color: white; min-width:100%;height:500px">
+                <section class="py-3 text-center container-xxl" style="background-color: rgb(8, 109, 73); color: white; min-width:100%;height:450px">
                   <div class="row h-100 d-flex justify-content-center align-items-center">
                     <div class="col-lg-6 col-md-8 mx-auto">
                       <h1 class="fw-bold">Welcome Back, {{ username }}</h1>
@@ -1016,82 +1016,73 @@
                       <!-- Custom JavaScript -->
                       <script>
                         document.addEventListener('DOMContentLoaded', function () {
-                            // Initialize tooltips
-                            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-title]'));
-                            tooltipTriggerList.map(function (tooltipTriggerEl) {
-                                return new bootstrap.Tooltip(tooltipTriggerEl);
-                            });
-                        
-                            // No need to initialize modals; Bootstrap handles it automatically.
-                        });
-                        
-                        // Handle form submission for adding a container
-                        document.getElementById('modalForm').addEventListener('submit', function (event) {
-                            event.preventDefault();
-                        
-                            var site = document.getElementById('url').value;
-                            var loginName = document.getElementById('email').value;
-                            var password = document.getElementById('password').value;
-                            var keyName = document.getElementById('keysName').value;
-                            var title = document.getElementById('title').value;
-                        
-                            // Print the keyName to the console
-                            console.log('Using key_name:', keyName);
-                        
-                            fetch('/add_container', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                },
-                                body: new URLSearchParams({
-                                    title: title,
-                                    email: loginName,
-                                    password: password,
-                                    url: site,
-                                    key_name: keyName,
-                                }),
-                            })
-                                .then(response => {
-                                    // Log the raw response for debugging
-                                    console.log('Raw Response:', response);
-                        
-                                    // Check for a non-2xx status
-                                    if (!response.ok) {
-                                        return response.json().then(data => {
-                                            // Show error toast with the server's error message if available
-                                            showToast('errorToast', data.message || 'Failed to add password. Please try again.');
-                                            throw new Error(data.message || 'Failed to add password');
-                                        });
-                                    }
-                        
-                                    // Parse the successful JSON response
-                                    return response.json();
-                                })
-                                .then(data => {
-                                    console.log('Success:', data);
-                        
-                                    // Check if the server returned an error-like response within the JSON
-                                    if (data.error) {
-                                        showToast('errorToast', data.error || 'An unexpected error occurred.');
-                                        throw new Error(data.error || 'Error in response data');
-                                    }
-                        
-                        
-                                    // Show success toast
-                                    showToast('successToast', 'Password added successfully!');
-                        
-                                    // Close modal and reset form
-                                    document.getElementById('modalForm').reset();
-                                    var exampleModal = bootstrap.Modal.getInstance(document.getElementById('exampleModal'));
-                                    exampleModal.hide();
-                                })
-                                .catch((error) => {
-                                    console.error('Error:', error);
-                        
-                                    // Show error toast for unexpected errors
-                                    showToast('errorToast', 'An error occurred. Ensure the Key Name exists.');
-                                });
-                        });
+            // Initialize Bootstrap tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-title]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        
+            // Handle form submission for adding a container
+            document.getElementById('modalForm').addEventListener('submit', async function (event) {
+                event.preventDefault();
+        
+                const site = document.getElementById('url').value.trim();
+                const loginName = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value.trim();
+                const keyName = document.getElementById('keysName').value.trim();
+                const title = document.getElementById('title').value.trim();
+        
+                console.log('Using key_name:', keyName);
+        
+                try {
+                    const response = await fetch('/add_container', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            title: title,
+                            login_name: loginName, // Updated key
+                            password: password,
+                            site: site, // Updated key
+                            key_name: keyName,
+                        }),
+                    });
+        
+                    console.log('Raw Response:', response);
+        
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        showToast('errorToast', errorData.message || 'Failed to add password. Please try again.');
+                        throw new Error(errorData.message || 'Failed to add password');
+                    }
+        
+                    const result = await response.json();
+                    console.log('Success:', result);
+        
+                    if (result.error) {
+                        showToast('errorToast', result.error || 'An unexpected error occurred.');
+                        throw new Error(result.error || 'Error in response data');
+                    }
+        
+                    showToast('successToast', 'Password added successfully!');
+                    document.getElementById('modalForm').reset();
+        
+                    // Close modal
+                    const exampleModal = bootstrap.Modal.getInstance(document.getElementById('exampleModal'));
+                    if (exampleModal) {
+                        exampleModal.hide();
+                    } else {
+                        console.error('Bootstrap modal instance not found.');
+                    }
+        
+                    // Optional: Reload the page or dynamically update UI
+                    setTimeout(() => location.reload(), 1000);
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('errorToast', 'An error occurred. Ensure the Key Name exists.');
+                }
+            });
                 
                 
                         $(document).ready(function () {
@@ -1512,6 +1503,7 @@
                     const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastElement);
                     toastBootstrap.show();
                 }
+                        })
             </script>
                   
               </main>
